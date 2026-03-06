@@ -4,10 +4,14 @@
   "description": "Convert any git repo into the canonical bare-hub worktree layout",
   "type": "module",
   "bin": {
-    "git-worktree-organize": "./src/cli.ts"
+    "git-worktree-organize": "./dist/cli.js"
   },
+  "files": [
+    "dist/"
+  ],
   "scripts": {
     "build": "bun build src/cli.ts --outfile dist/cli.js --target node",
+    "prepublishOnly": "bun run build",
     "test": "bun test",
     "test:watch": "vitest",
     "release": "op run -- npm publish"
