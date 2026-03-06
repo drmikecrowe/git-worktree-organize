@@ -63,6 +63,15 @@ export async function detect(repoPath: string): Promise<RepoConfig> {
         throw new Error('is a linked worktree, not a repo root')
       }
 
+      // Validate the resolved gitdir looks like a git object store
+      if (
+        !existsSync(join(absGitdir, 'HEAD')) ||
+        !existsSync(join(absGitdir, 'objects')) ||
+        !existsSync(join(absGitdir, 'refs'))
+      ) {
+        throw new Error(`gitdir does not appear to be a git repository: ${absGitdir}`)
+      }
+
       // bare-hub: resolved path ends with .bare
       if (absGitdir.endsWith('.bare')) {
         return { type: 'bare-hub', gitdir: absGitdir }
