@@ -33,6 +33,47 @@ export function sanitizeBranch(branch: string): string {
 }
 
 /**
+ * Returns true if dest looks like a partially-completed migration
+ * (.bare/ and .git file both exist).
+ */
+export function isPartialMigration(dest: string): boolean {
+  const gitFile = join(dest, '.git')
+  return (
+    existsSync(join(dest, '.bare')) &&
+    existsSync(gitFile) &&
+    statSync(gitFile).isFile()
+  )
+}
+
+/**
+ * Resume a partial migration: find worktrees registered in the hub whose
+ * paths are still outside dest/ and move them into place.
+ * Returns the hub path.
+ */
+export async function resumeMigrate(dest: string, log: (msg: string) => void = console.log): Promise<string> {
+  const destBare = join(dest, '.bare')
+  const hubWorktrees = await listWorktrees(dest)
+  const pending = hubWorktrees.filter(wt => !wt.isBare && !wt.path.startsWith(dest + '/'))
+
+  if (pending.length === 0) {
+    log('Nothing to resume — all worktrees are already in place.')
+    return dest
+  }
+
+  for (const wt of pending) {
+    const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
+    if (!existsSync(wt.path)) {
+      log(`warn: Skipping [${branch}] — path no longer exists: ${wt.path}`)
+      continue
+    }
+    log(`Moving [${branch}] → ${join(dest, sanitizeBranch(branch))}`)
+    await processLinkedWorktree(wt, dest, destBare)
+  }
+
+  return dest
+}
+
+/**
  * Orchestrate the full migration of a git repo into the bare-hub layout.
  * Returns the path to the created hub directory.
  */

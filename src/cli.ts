@@ -10,7 +10,7 @@ import { existsSync } from 'node:fs'
 import { run } from './run.ts'
 import { detect } from './detect.ts'
 import { listWorktrees } from './worktrees.ts'
-import { migrate, sanitizeBranch } from './migrate.ts'
+import { migrate, resumeMigrate, isPartialMigration, sanitizeBranch } from './migrate.ts'
 
 // ANSI color helpers
 const GREEN  = '\x1b[32m'
@@ -21,6 +21,13 @@ const RESET  = '\x1b[0m'
 function green(s: string)  { return `${GREEN}${s}${RESET}` }
 function yellow(s: string) { return `${YELLOW}${s}${RESET}` }
 function bold(s: string)   { return `${BOLD}${s}${RESET}` }
+
+function prompt(): Promise<string> {
+  return new Promise<string>(res => {
+    process.stdin.setEncoding('utf8')
+    process.stdin.once('data', chunk => res(chunk.toString().trim()))
+  })
+}
 
 function usage(): void {
   console.log(`Usage: git-worktree-organize <source> [destination]
@@ -58,6 +65,44 @@ async function main(): Promise<void> {
     ? resolve(destArg)
     : join(dirname(source), basename(source) + '-bare')
 
+  // ── Resume partial migration? ─────────────────────────────────────────────
+  if (isPartialMigration(dest)) {
+    const hubWorktrees = await listWorktrees(dest)
+    const pending = hubWorktrees.filter(wt => !wt.isBare && !wt.path.startsWith(dest + '/'))
+
+    console.log(`\n${yellow('warn:')} Partial migration detected at ${bold(dest)}`)
+
+    if (pending.length === 0) {
+      console.log('All worktrees are already in place — nothing to resume.')
+      process.exit(0)
+    }
+
+    console.log(`\nWorktrees still to move:`)
+    for (const wt of pending) {
+      const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
+      const exists = existsSync(wt.path)
+      const status = exists ? '' : `  ${yellow('(path missing)')}`
+      console.log(`  [${bold(branch)}]  ${wt.path}  →  ${join(dest, sanitizeBranch(branch))}${status}`)
+    }
+
+    console.log()
+    process.stdout.write('Resume migration? [y/N] ')
+    const resumeAns = await prompt()
+    if (!/^[Yy]$/.test(resumeAns)) {
+      console.log('Aborted.')
+      process.exit(0)
+    }
+
+    console.log()
+    const hubPath = await resumeMigrate(dest, msg => console.log(`${green('==>')} ${msg}`))
+    console.log()
+    console.log(`${green('==>')} Verifying with git worktree list...`)
+    console.log(run('git', ['-C', hubPath, 'worktree', 'list']).stdout)
+    console.log(`Done! Hub: ${hubPath}`)
+    process.exit(0)
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   console.log(`\n${green('==>')} Reading worktrees from ${source}\n`)
 
   // Detect repo type and list worktrees for display
@@ -74,10 +119,7 @@ async function main(): Promise<void> {
     }
     console.log()
     process.stdout.write('Remove them with `git worktree prune` and continue? [y/N] ')
-    const pruneAns = await new Promise<string>(res => {
-      process.stdin.setEncoding('utf8')
-      process.stdin.once('data', chunk => res(chunk.toString().trim()))
-    })
+    const pruneAns = await prompt()
     if (!/^[Yy]$/.test(pruneAns)) {
       console.log('Aborted.')
       process.stdin.destroy()
@@ -132,10 +174,7 @@ async function main(): Promise<void> {
 
   // Interactive confirmation
   process.stdout.write('Proceed? [y/N] ')
-  const ans = await new Promise<string>(resolve => {
-    process.stdin.setEncoding('utf8')
-    process.stdin.once('data', chunk => resolve(chunk.toString().trim()))
-  })
+  const ans = await prompt()
   process.stdin.destroy()
 
   if (!/^[Yy]$/.test(ans)) {
