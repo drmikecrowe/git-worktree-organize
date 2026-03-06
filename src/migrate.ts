@@ -64,14 +64,24 @@ export function isPartialMigration(dest: string): boolean {
 }
 
 /**
- * Resume a partial migration: find worktrees registered in the hub whose
- * paths are still outside dest/ and move them into place.
+ * Resume a partial migration: find worktrees registered in the hub that are
+ * not yet at their expected location (dest/<branch>) and move/repair them.
+ * Also handles worktrees that are already at the correct location but whose
+ * .git files point to stale paths (e.g. after a parent-dir rename).
  * Returns the hub path.
  */
 export async function resumeMigrate(dest: string, log: (msg: string) => void = console.log): Promise<string> {
   const destBare = join(dest, '.bare')
   const hubWorktrees = await listWorktrees(dest)
-  const pending = hubWorktrees.filter(wt => !wt.isBare && !wt.path.startsWith(dest + '/'))
+
+  // A worktree is pending if it's not already at its exact expected location.
+  // This catches both worktrees outside dest/ AND worktrees inside dest/ but
+  // at the wrong sub-path (e.g. dest/main-bare/feature instead of dest/feature).
+  const pending = hubWorktrees.filter(wt => {
+    if (wt.isBare) return false
+    const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
+    return wt.path !== join(dest, sanitizeBranch(branch))
+  })
 
   if (pending.length === 0) {
     log('Nothing to resume — all worktrees are already in place.')
@@ -80,12 +90,23 @@ export async function resumeMigrate(dest: string, log: (msg: string) => void = c
 
   for (const wt of pending) {
     const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
-    if (!existsSync(wt.path)) {
-      log(`warn: Skipping [${branch}] — path no longer exists: ${wt.path}`)
-      continue
+    const expectedPath = join(dest, sanitizeBranch(branch))
+
+    let wtPath = wt.path
+    if (!existsSync(wtPath)) {
+      // Registered path is stale (e.g. parent dir was renamed). Check if the
+      // worktree is already at its expected destination — it may have been
+      // moved there by a directory rename without git knowing about it.
+      if (existsSync(expectedPath)) {
+        wtPath = expectedPath
+      } else {
+        log(`warn: Skipping [${branch}] — path no longer exists: ${wt.path}`)
+        continue
+      }
     }
-    log(`Moving [${branch}] → ${join(dest, sanitizeBranch(branch))}`)
-    await processLinkedWorktree(wt, dest, destBare)
+
+    log(`Moving [${branch}] → ${expectedPath}`)
+    await processLinkedWorktree({ ...wt, path: wtPath }, dest, destBare)
   }
 
   return dest

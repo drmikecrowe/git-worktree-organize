@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, dirname, basename } from 'node:path'
 import { $ } from 'bun'
 import { describe, it, expect } from 'vitest'
@@ -153,6 +153,69 @@ describe('migrate', () => {
     // Originals should be gone
     expect(existsSync(featureOrig)).toBe(false)
     expect(existsSync(hotfixOrig)).toBe(false)
+  })
+
+  it('resumeMigrate: repairs worktrees that are at correct location but have stale .git (parent-dir rename scenario)', async () => {
+    // Simulates recovery-1 from the field:
+    // - Hub was at old/main-bare/ with worktrees inside it
+    // - User renamed old/ → old.bak/, so worktrees moved with it
+    // - resumeMigrate(old.bak/main-bare/) should find the worktrees already at
+    //   dest/branch and fix their .git files instead of skipping them.
+    const tmp = makeTempDir()
+    const base = join(tmp, 'project')
+    const hubDir = join(base, 'main-bare')
+    mkdirSync(hubDir, { recursive: true })
+
+    // Build a hub with one worktree already inside it
+    const srcForHub = makeTempDir()
+    await makeStandardRepo(srcForHub, ['feature'])
+    const config = await detect(srcForHub)
+    await migrate(config, { source: srcForHub, dest: hubDir })
+
+    // Now rename base/ → base.old/ (simulating user renaming the parent dir)
+    const baseOld = join(tmp, 'project.old')
+    await $`mv -f ${base} ${baseOld}`.quiet()
+
+    const dest = join(baseOld, 'main-bare')
+    // resumeMigrate should detect the worktrees are already at dest/feature
+    // (they moved with the rename) and repair their .git files
+    const logs: string[] = []
+    await resumeMigrate(dest, msg => logs.push(msg))
+
+    await assertHubStructure(dest)
+    await assertWorktreeWorks(dest, 'main')
+    await assertWorktreeWorks(dest, 'feature')
+  })
+
+  it('resumeMigrate: moves worktrees at wrong sub-path inside dest and repairs .git (nested-path scenario)', async () => {
+    // Simulates recovery-2 from the field:
+    // - Hub is at dest/ but worktrees ended up at dest/sub/feature instead of
+    //   dest/feature (wrong nesting, e.g. after manual recovery steps)
+    // - resumeMigrate(dest/) should detect the mismatch, move them, and fix .git
+    const src = makeTempDir()
+    await makeStandardRepo(src, ['feature'])
+    const config = await detect(src)
+    const dest = src + '-hub'
+    await migrate(config, { source: src, dest })
+
+    // Move feature worktree into a wrong sub-path inside dest/
+    const subDir = join(dest, 'sub')
+    mkdirSync(subDir, { recursive: true })
+    const featureCorrect = join(dest, 'feature')
+    const featureWrong   = join(subDir, 'feature')
+    await $`mv -f ${featureCorrect} ${featureWrong}`.quiet()
+    // Update git's record so it knows about the new (wrong) location
+    await $`git -C ${dest} worktree repair ${featureWrong}`.quiet()
+
+    // resumeMigrate should detect feature is at dest/sub/feature (!= dest/feature)
+    // and move it to dest/feature, fixing .git files
+    const logs: string[] = []
+    await resumeMigrate(dest, msg => logs.push(msg))
+
+    await assertWorktreeWorks(dest, 'main')
+    await assertWorktreeWorks(dest, 'feature')
+    expect(existsSync(join(dest, 'feature'))).toBe(true)
+    expect(existsSync(featureWrong)).toBe(false)
   })
 
   it('migrates when source parent dir was renamed (stale worktree paths point to dest)', async () => {
