@@ -1,0 +1,20 @@
+{
+  "name": "git-worktree-organize",
+  "version": "1.0.0",
+  "description": "Convert any git repo into the canonical bare-hub worktree layout",
+  "type": "module",
+  "bin": {
+    "git-worktree-organize": "./src/cli.ts"
+  },
+  "scripts": {
+    "build": "bun build src/cli.ts --outfile dist/cli.js --target node",
+    "test": "bun test",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.0.0",
+    "vitest": "^2.0.0"
+  },
+  "license": "MIT"
+}

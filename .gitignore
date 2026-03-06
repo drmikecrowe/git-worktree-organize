@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime
+*.pid
+*.seed
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# TypeScript
+*.tsbuildinfo
+
+# Beads runtime files (managed separately via .beads/.gitignore)
+.beads/dolt/
+.beads/dolt-access.lock
+.beads/bd.sock
+.beads/bd.sock.startlock
+.beads/sync-state.json
+.beads/last-touched
+.beads/.local_version
+.beads/redirect
+.beads/.sync.lock
+.beads/export-state/
+.beads/ephemeral.sqlite3*
+.beads/dolt-server.pid
+.beads/dolt-server.log
+.beads/dolt-server.lock
+.beads/dolt-monitor.pid

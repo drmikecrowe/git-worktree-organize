@@ -1,0 +1,9 @@
+{
+  "backend": "dolt",
+  "database": "dolt",
+  "dolt_mode": "server",
+  "dolt_server_host": "127.0.0.1",
+  "dolt_server_port": 3307,
+  "dolt_database": "git_worktree_organize",
+  "last_bd_version": "0.56.1"
+}
