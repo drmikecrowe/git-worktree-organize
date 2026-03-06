@@ -33,6 +33,24 @@ export function sanitizeBranch(branch: string): string {
 }
 
 /**
+ * If `worktreePath` doesn't exist but was registered when the parent directory
+ * had a different name (e.g. "expense" renamed to "expense.old"), try to find
+ * the actual path by substituting the `dest` prefix with `sourceParent`.
+ */
+export function resolveWorktreePath(
+  worktreePath: string,
+  dest: string,
+  sourceParent: string,
+): string {
+  if (existsSync(worktreePath)) return worktreePath
+  if (worktreePath.startsWith(dest + '/')) {
+    const remapped = sourceParent + worktreePath.slice(dest.length)
+    if (existsSync(remapped)) return remapped
+  }
+  return worktreePath
+}
+
+/**
  * Returns true if dest looks like a partially-completed migration
  * (.bare/ and .git file both exist).
  */
@@ -119,6 +137,16 @@ export async function migrate(config: RepoConfig, options: MigrateOptions): Prom
   // Step 7: Write dest/.git file
   writeFileSync(join(dest, '.git'), 'gitdir: ./.bare\n')
 
+  // Remap any linked worktree paths that are stale because the source's parent
+  // directory was renamed (the paths in git still reference the old name which
+  // happens to match dest). Main worktree (index 0) uses `source` directly.
+  const sourceParent = dirname(source)
+  const worktreesResolved = worktrees.map((wt, i) =>
+    i === 0 && config.type === 'standard'
+      ? wt
+      : { ...wt, path: resolveWorktreePath(wt.path, dest, sourceParent) },
+  )
+
   // Step 8: If standard, handle main worktree
   if (config.type === 'standard') {
     const mainBranch = worktrees[0].branch!
@@ -154,12 +182,12 @@ export async function migrate(config: RepoConfig, options: MigrateOptions): Prom
     writeFileSync(join(mainDest, '.git'), `gitdir: ${mainAdminDir}\n`)
 
     // Process linked worktrees starting at index 1
-    for (let i = 1; i < worktrees.length; i++) {
-      await processLinkedWorktree(worktrees[i], dest, destBare)
+    for (let i = 1; i < worktreesResolved.length; i++) {
+      await processLinkedWorktree(worktreesResolved[i], dest, destBare)
     }
   } else {
     // Step 9: Not standard — process all linked worktrees starting at index 0
-    for (const wt of worktrees) {
+    for (const wt of worktreesResolved) {
       await processLinkedWorktree(wt, dest, destBare)
     }
   }

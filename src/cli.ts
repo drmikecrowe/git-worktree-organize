@@ -10,7 +10,7 @@ import { existsSync } from 'node:fs'
 import { run } from './run.ts'
 import { detect } from './detect.ts'
 import { listWorktrees } from './worktrees.ts'
-import { migrate, resumeMigrate, isPartialMigration, sanitizeBranch } from './migrate.ts'
+import { migrate, resumeMigrate, isPartialMigration, sanitizeBranch, resolveWorktreePath } from './migrate.ts'
 
 // ANSI color helpers
 const GREEN  = '\x1b[32m'
@@ -111,8 +111,14 @@ async function main(): Promise<void> {
   const config = await detect(source)
   const allWorktrees = await listWorktrees(source)
 
-  // Check for worktrees whose paths no longer exist and offer to prune them
-  const missing = allWorktrees.filter(wt => !wt.isBare && !existsSync(wt.path))
+  // Check for worktrees whose paths no longer exist and offer to prune them.
+  // Exclude paths that are stale due to a parent-dir rename but actually exist
+  // at the remapped location (dest prefix → dirname(source)).
+  const missing = allWorktrees.filter(wt => {
+    if (wt.isBare) return false
+    const actual = resolveWorktreePath(wt.path, dest, dirname(source))
+    return !existsSync(actual)
+  })
   if (missing.length > 0) {
     console.log(`${yellow('warn:')} The following worktree paths no longer exist:`)
     for (const wt of missing) {

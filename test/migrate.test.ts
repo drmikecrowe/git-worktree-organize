@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import { join, dirname, basename } from 'node:path'
 import { $ } from 'bun'
 import { describe, it, expect } from 'vitest'
@@ -153,6 +153,44 @@ describe('migrate', () => {
     // Originals should be gone
     expect(existsSync(featureOrig)).toBe(false)
     expect(existsSync(hotfixOrig)).toBe(false)
+  })
+
+  it('migrates when source parent dir was renamed (stale worktree paths point to dest)', async () => {
+    // Scenario: repo was originally at base/main with a linked worktree at
+    // base/main-worktrees/feature (inside the same parent). Git records the
+    // absolute worktree path as base/main-worktrees/feature.
+    // User renames base/ → base.old/, then runs:
+    //   git-worktree-organize base.old/main base
+    // Git still records the worktree at base/main-worktrees/feature (doesn't
+    // exist), but it actually lives at base.old/main-worktrees/feature.
+    // migrate() should detect and remap these stale paths.
+    const tmp = makeTempDir()
+    const base = join(tmp, 'expense')
+    const sourceOrig = join(base, 'main')
+    mkdirSync(sourceOrig, { recursive: true })
+    await $`git init ${sourceOrig}`.quiet()
+    await $`git -C ${sourceOrig} config user.email "test@test.com"`.quiet()
+    await $`git -C ${sourceOrig} config user.name "Test"`.quiet()
+    await $`git -C ${sourceOrig} commit --allow-empty -m "init"`.quiet()
+
+    // Add worktree inside base/ (sibling of 'main')
+    const wtDir = join(base, 'main-worktrees', 'feature')
+    mkdirSync(dirname(wtDir), { recursive: true })
+    await $`git -C ${sourceOrig} worktree add -b feature ${wtDir}`.quiet()
+
+    // Rename base/ → base.old/ (parent dir renamed, git paths now stale)
+    const baseOld = join(tmp, 'expense.old')
+    await $`mv -f ${base} ${baseOld}`.quiet()
+
+    const source = join(baseOld, 'main')
+    const dest = base  // same path as the original base (= 'expense')
+
+    const config = await detect(source)
+    await migrate(config, { source, dest })
+
+    await assertHubStructure(dest)
+    await assertWorktreeWorks(dest, 'main')
+    await assertWorktreeWorks(dest, 'feature')
   })
 
   it('throws if dest/.bare already exists', async () => {
