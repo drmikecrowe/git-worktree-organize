@@ -60,10 +60,12 @@ async function main(): Promise<void> {
   // Resolve source early so we can display it
   const source = resolve(sourcePath)
 
-  // Compute the destination the same way migrate() does
-  const dest = destArg
-    ? resolve(destArg)
-    : join(dirname(source), basename(source) + '-bare')
+  // If source itself is already a partial hub, resume in-place (dest = source)
+  const dest = isPartialMigration(source)
+    ? source
+    : destArg
+      ? resolve(destArg)
+      : join(dirname(source), basename(source) + '-bare')
 
   // ── Resume partial migration? ─────────────────────────────────────────────
   if (isPartialMigration(dest)) {
