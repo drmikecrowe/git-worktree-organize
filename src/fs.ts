@@ -1,5 +1,5 @@
 import { statSync, renameSync } from 'node:fs'
-import { $ } from 'bun'
+import { run } from './run.ts'
 
 /**
  * Move `src` to `dest`.
@@ -9,8 +9,8 @@ export async function move(src: string, dest: string): Promise<void> {
   if (samefs(src, dest)) {
     renameSync(src, dest)
   } else {
-    await $`cp -a ${src} ${dest}`.quiet()
-    await $`rm -rf ${src}`.quiet()
+    run('cp', ['-a', src, dest])
+    run('rm', ['-rf', src])
   }
 }
 

@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync, readFileSync, existsSync, renameSync, statSync } from 'node:fs'
 import { join, dirname, basename, resolve } from 'node:path'
-import { $ } from 'bun'
+import { run } from './run.ts'
 import type { RepoConfig } from './detect.ts'
 import { listWorktrees } from './worktrees.ts'
 import { setGitConfig } from './git.ts'
@@ -15,8 +15,8 @@ async function moveDir(src: string, dest: string): Promise<void> {
   if (statSync(src).dev === statSync(destForStat).dev) {
     renameSync(src, dest)
   } else {
-    await $`cp -a ${src} ${dest}`.quiet()
-    await $`rm -rf ${src}`.quiet()
+    run('cp', ['-a', src, dest])
+    run('rm', ['-rf', src])
   }
 }
 
@@ -67,7 +67,7 @@ export async function migrate(config: RepoConfig, options: MigrateOptions): Prom
   mkdirSync(destBare, { recursive: true })
 
   // Step 4: Copy git database: cp -a <source_gitdir>/. dest/.bare/
-  await $`cp -a ${config.gitdir + '/.'}  ${destBare + '/'}`.quiet()
+  run('cp', ['-a', config.gitdir + '/.', destBare + '/'])
 
   // Step 5: Set core.bare = true
   await setGitConfig('core.bare', 'true', { gitdir: destBare })
@@ -88,7 +88,7 @@ export async function migrate(config: RepoConfig, options: MigrateOptions): Prom
     const mainHeadContent = readFileSync(join(destBare, 'HEAD'), 'utf8')
 
     // Remove source/.git directory
-    await $`rm -rf ${join(source, '.git')}`.quiet()
+    run('rm', ['-rf', join(source, '.git')])
 
     // Move source dir → mainDest
     await moveDir(source, mainDest)

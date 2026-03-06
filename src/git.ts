@@ -1,15 +1,15 @@
-import { $ } from 'bun'
+import { run } from './run.ts'
 
 /**
  * Run a git command and return stdout as a string.
  * Throws if the command exits non-zero.
  */
 export async function git(args: string[], options?: { cwd?: string; env?: Record<string, string> }): Promise<string> {
-  const proc = $`git ${args}`.quiet()
-  if (options?.cwd) proc.cwd(options.cwd)
-  if (options?.env) proc.env({ ...process.env, ...options.env })
-  const result = await proc
-  return result.stdout.toString()
+  const result = run('git', args, {
+    cwd: options?.cwd,
+    env: options?.env ? { ...process.env, ...options.env } : undefined,
+  })
+  return result.stdout
 }
 
 /**

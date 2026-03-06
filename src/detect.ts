@@ -1,6 +1,6 @@
 import { existsSync, statSync, readFileSync } from 'node:fs'
 import { join, resolve, isAbsolute } from 'node:path'
-import { execSync } from 'node:child_process'
+import { run } from './run.ts'
 
 export type RepoConfig =
   | { type: 'standard';      gitdir: string; mainWorktree: string }
@@ -15,11 +15,8 @@ export type RepoConfig =
  */
 function readCoreBare(gitdir: string): boolean {
   try {
-    const result = execSync(`git --git-dir=${gitdir} config --get core.bare`, {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim()
-    return result === 'true'
+    const result = run('git', ['--git-dir', gitdir, 'config', '--get', 'core.bare'])
+    return result.stdout.trim() === 'true'
   } catch {
     // exit code 1 means key not found — treat as false
     return false

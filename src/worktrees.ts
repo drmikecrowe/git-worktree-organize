@@ -1,4 +1,4 @@
-import { $ } from 'bun'
+import { run } from './run.ts'
 
 export interface Worktree {
   path: string
@@ -49,6 +49,6 @@ export function parsePorcelain(output: string): Worktree[] {
  * List all worktrees for the repo at `repoPath`.
  */
 export async function listWorktrees(repoPath: string): Promise<Worktree[]> {
-  const result = await $`git -C ${repoPath} worktree list --porcelain`.text()
-  return parsePorcelain(result)
+  const result = run('git', ['-C', repoPath, 'worktree', 'list', '--porcelain'])
+  return parsePorcelain(result.stdout)
 }

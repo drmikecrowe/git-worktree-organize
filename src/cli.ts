@@ -6,7 +6,7 @@
  */
 
 import { resolve, join, dirname, basename } from 'node:path'
-import { $ } from 'bun'
+import { run } from './run.ts'
 import { detect } from './detect.ts'
 import { listWorktrees } from './worktrees.ts'
 import { migrate, sanitizeBranch } from './migrate.ts'
@@ -121,7 +121,7 @@ async function main(): Promise<void> {
 
   // Verify
   console.log(`${green('==>')} Verifying with git worktree list...`)
-  const verifyOutput = await $`git -C ${hubPath} worktree list`.text()
+  const verifyOutput = run('git', ['-C', hubPath, 'worktree', 'list']).stdout
   console.log(verifyOutput)
 
   console.log(`Done! Hub: ${hubPath}`)
