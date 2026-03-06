@@ -10,7 +10,7 @@ import { existsSync } from 'node:fs'
 import { run } from './run.ts'
 import { detect } from './detect.ts'
 import { listWorktrees } from './worktrees.ts'
-import { migrate, resumeMigrate, isPartialMigration, sanitizeBranch, resolveWorktreePath } from './migrate.ts'
+import { migrate, resumeMigrate, repairHub, isPartialMigration, sanitizeBranch, resolveWorktreePath, findHub } from './migrate.ts'
 
 // ANSI color helpers
 const GREEN  = '\x1b[32m'
@@ -67,10 +67,42 @@ async function main(): Promise<void> {
       ? resolve(destArg)
       : join(dirname(source), basename(source) + '-bare')
 
+  // ── Source is a worktree inside an existing hub? → offer .git repair ────────
+  // When the user provides a path that is not a hub itself but sits inside one
+  // (e.g. a worktree with a broken .git file), navigate up to find the hub and
+  // offer to repair all worktree .git connections instead of migrating fresh.
+  if (!isPartialMigration(source) && !destArg) {
+    const ancestorHub = findHub(dirname(source))
+    if (ancestorHub) {
+      console.log(`\n${yellow('warn:')} ${bold(source)} is inside an existing hub at ${bold(ancestorHub)}`)
+      console.log(`\nThis looks like manually-placed worktrees with stale .git files.`)
+      console.log(`Running repair will fix all worktree .git connections in the hub.\n`)
+      process.stdout.write(`Repair hub at ${ancestorHub}? [y/N] `)
+      const repairAns = await prompt()
+      process.stdin.destroy()
+      if (!/^[Yy]$/.test(repairAns)) {
+        console.log('Aborted.')
+        process.exit(0)
+      }
+      console.log()
+      await repairHub(ancestorHub, msg => console.log(`${green('==>')} ${msg}`))
+      console.log()
+      console.log(`${green('==>')} Verifying with git worktree list...`)
+      console.log(run('git', ['-C', ancestorHub, 'worktree', 'list']).stdout)
+      console.log(`Done! Hub: ${ancestorHub}`)
+      process.exit(0)
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   // ── Resume partial migration? ─────────────────────────────────────────────
   if (isPartialMigration(dest)) {
     const hubWorktrees = await listWorktrees(dest)
-    const pending = hubWorktrees.filter(wt => !wt.isBare && !wt.path.startsWith(dest + '/'))
+    const pending = hubWorktrees.filter(wt => {
+      if (wt.isBare) return false
+      const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
+      return wt.path !== join(dest, sanitizeBranch(branch))
+    })
 
     console.log(`\n${yellow('warn:')} Partial migration detected at ${bold(dest)}`)
 

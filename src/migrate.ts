@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, readFileSync, existsSync, renameSync, statSync } from 'node:fs'
+import { mkdirSync, writeFileSync, readFileSync, existsSync, renameSync, statSync, readdirSync } from 'node:fs'
 import { join, dirname, basename, resolve } from 'node:path'
 import { run } from './run.ts'
 import type { RepoConfig } from './detect.ts'
@@ -64,6 +64,62 @@ export function isPartialMigration(dest: string): boolean {
 }
 
 /**
+ * Walk upward from `startPath` to find an ancestor hub directory
+ * (.bare/ + .git file). Returns the hub path or null if not found.
+ * Useful when the caller provides a worktree path with a broken .git file
+ * rather than the hub root itself.
+ */
+export function findHub(startPath: string): string | null {
+  let current = resolve(startPath)
+  while (true) {
+    if (isPartialMigration(current)) return current
+    const parent = dirname(current)
+    if (parent === current) return null   // reached filesystem root
+    current = parent
+  }
+}
+
+/**
+ * Filesystem-based repair pass: scan dest/.bare/worktrees/ admin dirs and for
+ * each one that points to a worktree inside dest/, check whether the worktree's
+ * .git file points back to the correct admin dir. Fix it if not.
+ *
+ * This catches worktrees that are at their expected location (dest/<branch>)
+ * but whose .git files were never updated (e.g. admin gitdir was repaired via
+ * `git worktree repair` but the reverse pointer in .git was not).
+ *
+ * Note: admin dirs are named from the original worktree path, not the branch
+ * name, so we scan admin dirs (whose gitdir we trust) rather than by name.
+ */
+export async function repairHub(dest: string, log: (msg: string) => void = console.log): Promise<void> {
+  const adminBase = join(dest, '.bare', 'worktrees')
+  if (!existsSync(adminBase)) return
+
+  for (const adminName of readdirSync(adminBase)) {
+    const adminDir = join(adminBase, adminName)
+    if (!statSync(adminDir).isDirectory()) continue
+    const gitdirFile = join(adminDir, 'gitdir')
+    if (!existsSync(gitdirFile)) continue
+
+    // adminDir/gitdir contains the path to the worktree's .git file
+    const registeredGitFile = readFileSync(gitdirFile, 'utf8').trim()
+    const worktreePath = dirname(registeredGitFile)
+
+    // Only repair worktrees that are (or should be) inside dest/
+    if (!worktreePath.startsWith(dest + '/')) continue
+    if (!existsSync(registeredGitFile) || !statSync(registeredGitFile).isFile()) continue
+
+    const content = readFileSync(registeredGitFile, 'utf8')
+    const match = content.match(/^gitdir:\s*(.+)/m)
+    if (!match) continue
+    if (match[1].trim() === adminDir) continue   // already correct
+
+    log(`Repairing .git for [${basename(worktreePath)}]`)
+    writeFileSync(registeredGitFile, `gitdir: ${adminDir}\n`)
+  }
+}
+
+/**
  * Resume a partial migration: find worktrees registered in the hub that are
  * not yet at their expected location (dest/<branch>) and move/repair them.
  * Also handles worktrees that are already at the correct location but whose
@@ -85,29 +141,33 @@ export async function resumeMigrate(dest: string, log: (msg: string) => void = c
 
   if (pending.length === 0) {
     log('Nothing to resume — all worktrees are already in place.')
-    return dest
-  }
+  } else {
+    for (const wt of pending) {
+      const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
+      const expectedPath = join(dest, sanitizeBranch(branch))
 
-  for (const wt of pending) {
-    const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
-    const expectedPath = join(dest, sanitizeBranch(branch))
-
-    let wtPath = wt.path
-    if (!existsSync(wtPath)) {
-      // Registered path is stale (e.g. parent dir was renamed). Check if the
-      // worktree is already at its expected destination — it may have been
-      // moved there by a directory rename without git knowing about it.
-      if (existsSync(expectedPath)) {
-        wtPath = expectedPath
-      } else {
-        log(`warn: Skipping [${branch}] — path no longer exists: ${wt.path}`)
-        continue
+      let wtPath = wt.path
+      if (!existsSync(wtPath)) {
+        // Registered path is stale (e.g. parent dir was renamed). Check if the
+        // worktree is already at its expected destination — it may have been
+        // moved there by a directory rename without git knowing about it.
+        if (existsSync(expectedPath)) {
+          wtPath = expectedPath
+        } else {
+          log(`warn: Skipping [${branch}] — path no longer exists: ${wt.path}`)
+          continue
+        }
       }
-    }
 
-    log(`Moving [${branch}] → ${expectedPath}`)
-    await processLinkedWorktree({ ...wt, path: wtPath }, dest, destBare)
+      log(`Moving [${branch}] → ${expectedPath}`)
+      await processLinkedWorktree({ ...wt, path: wtPath }, dest, destBare)
+    }
   }
+
+  // Always run repair pass: fixes stale .git files for worktrees that are
+  // already at their expected location (e.g. manually placed by the user, or
+  // cases where admin gitdir was updated but worktree .git was not).
+  await repairHub(dest, log)
 
   return dest
 }

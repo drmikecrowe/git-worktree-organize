@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, dirname, basename } from 'node:path'
 import { $ } from 'bun'
 import { describe, it, expect } from 'vitest'
-import { migrate, resumeMigrate, isPartialMigration } from '../src/migrate.ts'
+import { migrate, resumeMigrate, repairHub, findHub, isPartialMigration } from '../src/migrate.ts'
 import { detect } from '../src/detect.ts'
 import {
   makeStandardRepo,
@@ -253,6 +253,87 @@ describe('migrate', () => {
 
     await assertHubStructure(dest)
     await assertWorktreeWorks(dest, 'main')
+    await assertWorktreeWorks(dest, 'feature')
+  })
+
+  it('findHub: returns hub when given hub path itself', async () => {
+    const src = makeTempDir()
+    await makeStandardRepo(src)
+    const config = await detect(src)
+    const dest = src + '-hub'
+    await migrate(config, { source: src, dest })
+
+    expect(findHub(dest)).toBe(dest)
+  })
+
+  it('findHub: returns hub when given a worktree path inside the hub', async () => {
+    const src = makeTempDir()
+    await makeStandardRepo(src, ['feature'])
+    const config = await detect(src)
+    const dest = src + '-hub'
+    await migrate(config, { source: src, dest })
+
+    // findHub from the feature worktree should navigate up to dest
+    expect(findHub(join(dest, 'feature'))).toBe(dest)
+  })
+
+  it('findHub: returns null when no hub ancestor exists', async () => {
+    expect(findHub('/tmp')).toBeNull()
+  })
+
+  it('repairHub: fixes stale .git files for worktrees already at correct location', async () => {
+    const src = makeTempDir()
+    await makeStandardRepo(src, ['feature'])
+    const config = await detect(src)
+    const dest = src + '-hub'
+    await migrate(config, { source: src, dest })
+
+    // Corrupt the .git file of the feature worktree (stale admin path)
+    const featurePath = join(dest, 'feature')
+    writeFileSync(join(featurePath, '.git'), 'gitdir: /nonexistent/old/path\n')
+
+    const logs: string[] = []
+    await repairHub(dest, msg => logs.push(msg))
+
+    // .git file should now point to the correct admin dir
+    await assertWorktreeWorks(dest, 'feature')
+    expect(logs.some(l => l.includes('feature'))).toBe(true)
+  })
+
+  it('repairHub: skips worktrees whose .git is already correct', async () => {
+    const src = makeTempDir()
+    await makeStandardRepo(src, ['feature'])
+    const config = await detect(src)
+    const dest = src + '-hub'
+    await migrate(config, { source: src, dest })
+
+    const logs: string[] = []
+    await repairHub(dest, msg => logs.push(msg))
+
+    // Nothing to repair — logs should be empty
+    expect(logs).toHaveLength(0)
+  })
+
+  it('resumeMigrate: repairHub pass fixes stale .git for in-place worktrees', async () => {
+    // Simulate: worktree IS at the expected location (git admin was updated
+    // via worktree repair) but the worktree's own .git file is still stale.
+    // resumeMigrate should call repairHub and fix it.
+    const src = makeTempDir()
+    await makeStandardRepo(src, ['feature'])
+    const config = await detect(src)
+    const dest = src + '-hub'
+    await migrate(config, { source: src, dest })
+
+    // Corrupt only the worktree .git file (leave admin gitdir correct)
+    const featurePath = join(dest, 'feature')
+    writeFileSync(join(featurePath, '.git'), 'gitdir: /nonexistent/old/path\n')
+
+    // git worktree list still reports feature at dest/feature (admin gitdir is
+    // correct) so the pending filter sees wt.path === expectedPath → skips it.
+    // The repairHub pass at the end of resumeMigrate should catch and fix it.
+    const logs: string[] = []
+    await resumeMigrate(dest, msg => logs.push(msg))
+
     await assertWorktreeWorks(dest, 'feature')
   })
 
