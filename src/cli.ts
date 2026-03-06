@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * git-worktree-organize <source> [destination]
  *
@@ -6,6 +6,7 @@
  */
 
 import { resolve, join, dirname, basename } from 'node:path'
+import { existsSync } from 'node:fs'
 import { run } from './run.ts'
 import { detect } from './detect.ts'
 import { listWorktrees } from './worktrees.ts'
@@ -62,6 +63,34 @@ async function main(): Promise<void> {
   // Detect repo type and list worktrees for display
   const config = await detect(source)
   const allWorktrees = await listWorktrees(source)
+
+  // Check for worktrees whose paths no longer exist and offer to prune them
+  const missing = allWorktrees.filter(wt => !wt.isBare && !existsSync(wt.path))
+  if (missing.length > 0) {
+    console.log(`${yellow('warn:')} The following worktree paths no longer exist:`)
+    for (const wt of missing) {
+      const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
+      console.log(`  [${branch}]  ${wt.path}`)
+    }
+    console.log()
+    process.stdout.write('Remove them with `git worktree prune` and continue? [y/N] ')
+    const pruneAns = await new Promise<string>(res => {
+      process.stdin.setEncoding('utf8')
+      process.stdin.once('data', chunk => res(chunk.toString().trim()))
+    })
+    if (!/^[Yy]$/.test(pruneAns)) {
+      console.log('Aborted.')
+      process.stdin.destroy()
+      process.exit(0)
+    }
+    run('git', ['-C', source, 'worktree', 'prune'])
+    console.log(`${green('==>')} Pruned stale worktrees.\n`)
+    // Re-read worktrees after pruning
+    const refreshed = await listWorktrees(source)
+    allWorktrees.length = 0
+    allWorktrees.push(...refreshed)
+  }
+
   const worktrees = allWorktrees.filter(wt => !wt.isBare)
 
   // Determine which branch is "main" (first worktree for standard repos)
