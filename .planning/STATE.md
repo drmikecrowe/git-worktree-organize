@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 current_plan: 05-02
-status: executing
-last_updated: "2026-03-07T20:15:00Z"
+status: verifying
+last_updated: "2026-03-07T20:58:49.651Z"
 progress:
   total_phases: 5
-  completed_phases: 4
-  total_plans: 7
-  completed_plans: 8
+  completed_phases: 5
+  total_plans: 9
+  completed_plans: 9
   percent: 100
 ---
 
@@ -35,7 +35,7 @@ progress:
 **Phase:** 05-cli-in-place (in progress)
 **Current Plan:** 05-02
 **Total Plans in Phase:** 2
-**Status:** Ready to execute
+**Status:** Phase complete — ready for verification
 **Progress:** [██████████] 100%
 
 ---
@@ -54,6 +54,7 @@ progress:
 | Phase 04 P01 | 4m | 3 tasks | 2 files |
 | Phase 03 P01 | 4m | 2 tasks | 3 files |
 | Phase 02 P03 | 21m | 4 tasks | 7 files |
+| Phase 05 P02 | 56m | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,8 @@ progress:
 | Return all valid candidates | Allows CLI to prompt user for selection when multiple matches | 2026-03-07 |
 | Validation mode routing | Check config.type === 'bare-hub' early in CLI to run validation | 2026-03-07 |
 | Integrated repair offer | Validation mode includes search-and-repair for missing/stale worktrees | 2026-03-07 |
+- [Phase 05]: Copy backup instead of move to preserve .old directory
+- [Phase 05]: Prompt for confirmation before in-place migration
 
 ### Active Concerns
 

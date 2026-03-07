@@ -32,9 +32,9 @@ Requirements for Production Ready milestone. Each maps to roadmap phases.
 
 - [x] **CLI-01**: User can run tool on existing hub directory to validate structure
 - [x] **CLI-02**: Validation reports which worktrees are healthy, missing, or have stale pointers
-- [ ] **CLI-03**: User running tool on standard repo is prompted to migrate in-place
-- [ ] **CLI-04**: In-place migration renames source to `.old` before proceeding
-- [ ] **CLI-05**: In-place migration destination matches original source path
+- [x] **CLI-03**: User running tool on standard repo is prompted to migrate in-place
+- [x] **CLI-04**: In-place migration renames source to `.old` before proceeding
+- [x] **CLI-05**: In-place migration destination matches original source path
 
 ### Quality
 
@@ -90,9 +90,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WORKTREE-06 | Phase 4 | Pending |
 | CLI-01 | Phase 5 | Complete |
 | CLI-02 | Phase 5 | Complete |
-| CLI-03 | Phase 5 | Pending |
-| CLI-04 | Phase 5 | Pending |
-| CLI-05 | Phase 5 | Pending |
+| CLI-03 | Phase 5 | Complete |
+| CLI-04 | Phase 5 | Complete |
+| CLI-05 | Phase 5 | Complete |
 | QUALITY-03 | Phase 5 | Complete |
 
 **Coverage:**
