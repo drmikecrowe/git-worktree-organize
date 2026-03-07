@@ -10,14 +10,14 @@
     "dist/"
   ],
   "scripts": {
-    "build": "bun build src/cli.ts --outfile dist/cli.js --target node",
-    "prepublishOnly": "bun run build",
+    "build": "npx esbuild src/cli.ts --outfile dist/cli.js --platform=node --bundle",
+    "prepublishOnly": "npm run build",
     "test": "bun test",
     "test:watch": "vitest",
     "release": "op run -- npm publish"
   },
   "devDependencies": {
-    "@types/bun": "latest",
+    "@types/node": "^20.0.0",
     "typescript": "^5.0.0",
     "vitest": "^2.0.0"
   },
