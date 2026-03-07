@@ -161,6 +161,7 @@ export async function resumeMigrate(dest: string, log: (msg: string) => void = c
 /**
  * Migrate a standard repository in-place.
  * Renames source to source.old, then creates the hub at the original source path.
+ * The backup at source.old is preserved.
  * Returns the path to the created hub directory.
  */
 export async function migrateInPlace(
@@ -181,29 +182,96 @@ export async function migrateInPlace(
   // Rename source to .old
   await move(resolvedSource, oldPath)
 
-  // Now migrate from oldPath to the original source path (in-place)
-  const config: RepoConfig = {
-    type: 'standard',
-    gitdir: join(oldPath, '.git'),
-    workdir: oldPath,
+  // Read worktrees from the backup location
+  const allWorktrees = await listWorktrees(oldPath)
+  const worktrees = allWorktrees.filter(wt => !wt.isBare)
+
+  if (worktrees.length === 0) {
+    throw new Error('No worktrees found in source repository')
   }
 
-  try {
-    const hubPath = await migrate(
-      config,
-      { source: oldPath, dest: resolvedSource },
-      log,
-      warn,
-    )
-
-    log(`Original repo backed up at: ${oldPath}`)
-
-    return hubPath
-  } catch (err) {
-    // On failure, leave .old as-is for manual recovery
-    warn?.(`Migration failed. Original repo preserved at: ${oldPath}`)
-    throw err
+  // Collision check on sanitized names
+  const seen = new Map<string, string>()
+  for (const wt of worktrees) {
+    const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
+    const safe = sanitizeBranch(branch)
+    if (seen.has(safe)) {
+      throw new Error(`branch name collision: '${seen.get(safe)}' and '${branch}' both map to '${safe}'`)
+    }
+    seen.set(safe, branch)
   }
+
+  // The main branch is the first worktree
+  const mainBranch = worktrees[0].branch!
+  const mainSafe = sanitizeBranch(mainBranch)
+
+  // Create hub directory structure
+  const destBare = join(resolvedSource, '.bare')
+  const mainDest = join(resolvedSource, mainSafe)
+
+  // Step 1: mkdir -p dest/.bare
+  mkdirSync(destBare, { recursive: true })
+
+  // Step 2: Copy git database: cp -a <oldPath>/.git/* dest/.bare/
+  // Note: We copy the contents (not the .git dir itself) into .bare
+  const gitDir = join(oldPath, '.git')
+  for (const entry of readdirSync(gitDir)) {
+    const srcPath = join(gitDir, entry)
+    const destPath = join(destBare, entry)
+    if (statSync(srcPath).isDirectory()) {
+      run('cp', ['-a', srcPath + '/.', destPath + '/'])
+    } else {
+      run('cp', ['-a', srcPath, destPath])
+    }
+  }
+
+  // Step 3: Set core.bare = true
+  await setGitConfig('core.bare', 'true', { gitdir: destBare })
+
+  // Step 4: Set remote.origin.fetch
+  await setGitConfig('remote.origin.fetch', '+refs/heads/*:refs/remotes/origin/*', { gitdir: destBare })
+
+  // Step 5: Write dest/.git file
+  writeFileSync(join(resolvedSource, '.git'), 'gitdir: ./.bare\n')
+
+  // Step 6: Read HEAD content from dest/.bare/HEAD
+  const mainHeadContent = readFileSync(join(destBare, 'HEAD'), 'utf8')
+
+  // Step 7: Copy the backup to main worktree location (not move!)
+  // We copy because we want to preserve the backup
+  log(`Creating main worktree at ${bold(mainDest)}`)
+  run('cp', ['-a', oldPath + '/.', mainDest + '/'])
+
+  // Step 8: Create dest/.bare/worktrees/mainSafe/ dir
+  const mainAdminDir = join(destBare, 'worktrees', mainSafe)
+  mkdirSync(mainAdminDir, { recursive: true })
+
+  // Step 9: Write gitdir, commondir, HEAD
+  writeFileSync(join(mainAdminDir, 'gitdir'), mainDest + '/.git\n')
+  writeFileSync(join(mainAdminDir, 'commondir'), '../../\n')
+  const headToWrite = mainHeadContent.endsWith('\n') ? mainHeadContent : mainHeadContent + '\n'
+  writeFileSync(join(mainAdminDir, 'HEAD'), headToWrite)
+
+  // Step 10: Move index if it exists
+  const bareIndex = join(destBare, 'index')
+  if (existsSync(bareIndex)) {
+    renameSync(bareIndex, join(mainAdminDir, 'index'))
+  }
+
+  // Step 11: Remove the .git directory from mainDest (it's now in the admin dir)
+  run('rm', ['-rf', join(mainDest, '.git')])
+
+  // Step 12: Write mainDest/.git
+  writeFileSync(join(mainDest, '.git'), `gitdir: ${mainAdminDir}\n`)
+
+  // Step 13: Process linked worktrees starting at index 1
+  for (let i = 1; i < worktrees.length; i++) {
+    await processLinkedWorktree(worktrees[i], resolvedSource, destBare, log, warn)
+  }
+
+  log(`Original repo backed up at: ${oldPath}`)
+
+  return resolvedSource
 }
 
 // Helper for bold text (needed for migrateInPlace log message)
