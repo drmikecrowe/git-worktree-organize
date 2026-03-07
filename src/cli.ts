@@ -11,6 +11,7 @@ import { run } from './run.ts'
 import { detect } from './detect.ts'
 import { listWorktrees } from './worktrees.ts'
 import { migrate, resumeMigrate, repairHub, isPartialMigration, sanitizeBranch, resolveWorktreePath, findHub } from './migrate.ts'
+import { findMissingWorktrees, repairWorktree, type SearchResult } from './recover.ts'
 
 // ANSI color helpers
 const GREEN  = '\x1b[32m'
@@ -104,7 +105,104 @@ async function main(): Promise<void> {
       return wt.path !== join(dest, sanitizeBranch(branch))
     })
 
+    // Check for missing worktrees (paths that don't exist)
+    const missing = hubWorktrees.filter(wt => {
+      if (wt.isBare) return false
+      return !existsSync(wt.path)
+    })
+
     console.log(`\n${yellow('warn:')} Partial migration detected at ${bold(dest)}`)
+
+    // Handle missing worktrees with search-and-repair
+    if (missing.length > 0) {
+      console.log(`\nThe following worktree paths no longer exist:`)
+      for (const wt of missing) {
+        const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
+        console.log(`  [${branch}]  ${wt.path}`)
+      }
+      console.log()
+
+      // Search for missing worktrees
+      const searchDirs = [dirname(dest)]
+      console.log(`${green('==>')} Searching for missing worktrees...`)
+      const results = await findMissingWorktrees(
+        dest,
+        searchDirs,
+        msg => console.log(`    ${msg}`)
+      )
+
+      // Display results
+      const found = results.filter(r => r.candidates.length > 0)
+      const notFound = results.filter(r => r.candidates.length === 0)
+      const multiple = results.filter(r => r.candidates.length > 1)
+
+      if (notFound.length > 0) {
+        console.log(`\n${yellow('Not found:')}`)
+        for (const r of notFound) {
+          console.log(`  [${r.branch}]`)
+        }
+      }
+
+      if (found.length === 0) {
+        console.log(`\nNo worktrees could be located. Consider pruning them with 'git worktree prune'.`)
+        process.exit(0)
+      }
+
+      // Handle multiple matches with user selection
+      const selections: Map<string, string> = new Map()
+      for (const r of multiple) {
+        console.log(`\n${bold(`[${r.branch}]`)} has multiple candidates:`)
+        for (let i = 0; i < r.candidates.length; i++) {
+          console.log(`  ${i + 1}) ${r.candidates[i]}`)
+        }
+        process.stdout.write(`Select which to use (1-${r.candidates.length}) [skip]: `)
+        const sel = await prompt()
+        const idx = parseInt(sel) - 1
+        if (idx >= 0 && idx < r.candidates.length) {
+          selections.set(r.branch, r.candidates[idx])
+        }
+      }
+
+      // Display found worktrees in table format
+      console.log(`\n${green('Found:')}`)
+      const maxBranchLen = found.reduce((m, r) => Math.max(m, r.branch.length), 0)
+      for (const r of found) {
+        const path = selections.get(r.branch) ?? r.candidates[0]
+        const branchCol = bold(`[${r.branch}]`).padEnd(maxBranchLen + 2 + BOLD.length + RESET.length)
+        console.log(`  ${branchCol}  ${path}`)
+      }
+
+      // Batch confirmation
+      console.log()
+      process.stdout.write('Repair these worktrees? [y/N] ')
+      const repairAns = await prompt()
+      if (!/^[Yy]$/.test(repairAns)) {
+        console.log('Aborted.')
+        process.stdin.destroy()
+        process.exit(0)
+      }
+
+      // Perform repairs
+      console.log()
+      for (const r of found) {
+        const path = selections.get(r.branch) ?? r.candidates[0]
+        await repairWorktree(path, dest, msg => console.log(`${green('==>')} ${msg}`))
+      }
+      console.log(`${green('==>')} Repaired ${found.length} worktree(s).\n`)
+
+      // Re-read worktrees after repair
+      const refreshed = await listWorktrees(dest)
+      hubWorktrees.length = 0
+      hubWorktrees.push(...refreshed)
+
+      // Recalculate pending after repair
+      pending.length = 0
+      pending.push(...hubWorktrees.filter(wt => {
+        if (wt.isBare) return false
+        const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
+        return wt.path !== join(dest, sanitizeBranch(branch))
+      }))
+    }
 
     if (pending.length === 0) {
       console.log('All worktrees are already in place — nothing to resume.')
@@ -147,7 +245,8 @@ async function main(): Promise<void> {
   const config = await detect(source)
   const allWorktrees = await listWorktrees(source)
 
-  // Check for worktrees whose paths no longer exist and offer to prune them.
+  // ── Missing worktrees? Search and repair instead of prune ─────────────────
+  // Check for worktrees whose paths no longer exist and search for them.
   // Exclude paths that are stale due to a parent-dir rename but actually exist
   // at the remapped location (dest prefix → dirname(source)).
   const missing = allWorktrees.filter(wt => {
@@ -155,27 +254,93 @@ async function main(): Promise<void> {
     const actual = resolveWorktreePath(wt.path, dest, dirname(source))
     return !existsSync(actual)
   })
+
   if (missing.length > 0) {
-    console.log(`${yellow('warn:')} The following worktree paths no longer exist:`)
+    console.log(`\n${yellow('warn:')} The following worktree paths no longer exist:`)
     for (const wt of missing) {
       const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
       console.log(`  [${branch}]  ${wt.path}`)
     }
     console.log()
-    process.stdout.write('Remove them with `git worktree prune` and continue? [y/N] ')
-    const pruneAns = await prompt()
-    if (!/^[Yy]$/.test(pruneAns)) {
+
+    // Search for missing worktrees
+    const searchDirs = [dirname(source)]
+    if (dest !== source) {
+      searchDirs.push(dest)
+    }
+
+    console.log(`${green('==>')} Searching for missing worktrees...`)
+    const results = await findMissingWorktrees(
+      source,
+      searchDirs,
+      msg => console.log(`    ${msg}`)
+    )
+
+    // Display results
+    const found = results.filter(r => r.candidates.length > 0)
+    const notFound = results.filter(r => r.candidates.length === 0)
+    const multiple = results.filter(r => r.candidates.length > 1)
+
+    if (notFound.length > 0) {
+      console.log(`\n${yellow('Not found:')}`)
+      for (const r of notFound) {
+        console.log(`  [${r.branch}]`)
+      }
+    }
+
+    if (found.length === 0) {
+      console.log(`\nNo worktrees could be located. Consider pruning them with 'git worktree prune'.`)
+      process.exit(0)
+    }
+
+    // Handle multiple matches with user selection
+    const selections: Map<string, string> = new Map()
+    for (const r of multiple) {
+      console.log(`\n${bold(`[${r.branch}]`)} has multiple candidates:`)
+      for (let i = 0; i < r.candidates.length; i++) {
+        console.log(`  ${i + 1}) ${r.candidates[i]}`)
+      }
+      process.stdout.write(`Select which to use (1-${r.candidates.length}) [skip]: `)
+      const sel = await prompt()
+      const idx = parseInt(sel) - 1
+      if (idx >= 0 && idx < r.candidates.length) {
+        selections.set(r.branch, r.candidates[idx])
+      }
+    }
+
+    // Display found worktrees in table format
+    console.log(`\n${green('Found:')}`)
+    const maxBranchLen = found.reduce((m, r) => Math.max(m, r.branch.length), 0)
+    for (const r of found) {
+      const path = selections.get(r.branch) ?? r.candidates[0]
+      const branchCol = bold(`[${r.branch}]`).padEnd(maxBranchLen + 2 + BOLD.length + RESET.length)
+      console.log(`  ${branchCol}  ${path}`)
+    }
+
+    // Batch confirmation
+    console.log()
+    process.stdout.write('Repair these worktrees? [y/N] ')
+    const repairAns = await prompt()
+    if (!/^[Yy]$/.test(repairAns)) {
       console.log('Aborted.')
       process.stdin.destroy()
       process.exit(0)
     }
-    run('git', ['-C', source, 'worktree', 'prune'])
-    console.log(`${green('==>')} Pruned stale worktrees.\n`)
-    // Re-read worktrees after pruning
+
+    // Perform repairs
+    console.log()
+    for (const r of found) {
+      const path = selections.get(r.branch) ?? r.candidates[0]
+      await repairWorktree(path, source, msg => console.log(`${green('==>')} ${msg}`))
+    }
+    console.log(`${green('==>')} Repaired ${found.length} worktree(s).\n`)
+
+    // Re-read worktrees after repair
     const refreshed = await listWorktrees(source)
     allWorktrees.length = 0
     allWorktrees.push(...refreshed)
   }
+  // ─────────────────────────────────────────────────────────────────────────
 
   const worktrees = allWorktrees.filter(wt => !wt.isBare)
 
