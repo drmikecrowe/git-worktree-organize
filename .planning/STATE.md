@@ -18,9 +18,9 @@
 ## Current Position
 
 **Phase:** 02-test-migration (in progress)
-**Plan:** 01/04 complete
-**Status:** Shell helper created, ready to migrate test helpers
-**Progress:** `[=====               ]` 25%
+**Plan:** 02/04 complete
+**Status:** All test files migrated to new shell helper API
+**Progress:** `[==========          ]` 50%
 
 ---
 
@@ -29,7 +29,7 @@
 | Metric | Value |
 |--------|-------|
 | Phases Completed | 1/5 |
-| Requirements Delivered | 4/20 |
+| Requirements Delivered | 6/20 |
 | Tests Passing | 37/37 (baseline + shell helper) |
 | Days in Milestone | 0 |
 
@@ -63,7 +63,6 @@
 
 ### Active Concerns
 
-- Test migration may require significant helper refactoring (Bun `$` API replacement)
 - Worktree search depth (3 levels) may need tuning based on real-world usage
 
 ### Blockers
@@ -77,14 +76,14 @@ None.
 ### Last Session
 
 **Date:** 2026-03-07
-**Activity:** Completed Phase 2 Plan 1 - Shell helper creation
-**Outcome:** Function-based shell helper ready for test migration
+**Activity:** Completed Phase 2 Plan 2 - Test file migration
+**Outcome:** All test files migrated from Bun $ API to run() function API
 
 ### Next Steps
 
-1. Run `/gsd:execute-phase` to continue Phase 2 (migrate test/helpers/repo.ts)
-2. Migrate remaining tests to use new shell helper
-3. Remove bun alias from vitest.config.ts after all tests migrated
+1. Run `/gsd:execute-phase` to continue Phase 2 (remove bun shim)
+2. Remove bun alias from vitest.config.ts
+3. Verify all tests pass without bun shim
 
 ---
 
