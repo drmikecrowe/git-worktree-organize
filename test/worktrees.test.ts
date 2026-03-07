@@ -5,6 +5,9 @@ import { join } from 'node:path'
 import { run } from './helpers/shell.ts'
 import { parsePorcelain, listWorktrees } from '../src/worktrees'
 
+/** Environment for isolated git operations (ignores user's ~/.gitconfig) */
+const isolatedEnv = { GIT_CONFIG_GLOBAL: '/dev/null' }
+
 describe('parsePorcelain', () => {
   it('parses a single normal worktree with branch main', () => {
     const input = `worktree /path/to/main
@@ -134,15 +137,15 @@ describe('listWorktrees', () => {
     const linkedDir = join(tmpDir, 'linked')
 
     // Initialize a git repo with an initial commit
-    await run('git', ['init', repoDir], { quiet: true })
-    await run('git', ['-C', repoDir, 'config', 'user.email', 'test@example.com'], { quiet: true })
-    await run('git', ['-C', repoDir, 'config', 'user.name', 'Test'], { quiet: true })
+    await run('git', ['init', repoDir], { quiet: true, env: isolatedEnv })
+    await run('git', ['-C', repoDir, 'config', 'user.email', 'test@example.com'], { quiet: true, env: isolatedEnv })
+    await run('git', ['-C', repoDir, 'config', 'user.name', 'Test'], { quiet: true, env: isolatedEnv })
     await run('touch', [join(repoDir, 'README')], { quiet: true })
-    await run('git', ['-C', repoDir, 'add', 'README'], { quiet: true })
-    await run('git', ['-C', repoDir, 'commit', '-m', 'init'], { quiet: true })
+    await run('git', ['-C', repoDir, 'add', 'README'], { quiet: true, env: isolatedEnv })
+    await run('git', ['-C', repoDir, 'commit', '-m', 'init'], { quiet: true, env: isolatedEnv })
 
     // Add a linked worktree on a new branch
-    await run('git', ['-C', repoDir, 'worktree', 'add', '-b', 'feature', linkedDir], { quiet: true })
+    await run('git', ['-C', repoDir, 'worktree', 'add', '-b', 'feature', linkedDir], { quiet: true, env: isolatedEnv })
 
     const worktrees = await listWorktrees(repoDir)
 

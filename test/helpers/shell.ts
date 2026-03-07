@@ -24,6 +24,8 @@ export interface RunOptions {
   quiet?: boolean
   /** Working directory for the command */
   cwd?: string
+  /** Environment variables to merge with process.env */
+  env?: Record<string, string>
 }
 
 /**
@@ -52,6 +54,7 @@ export async function run(
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, {
       cwd: options?.cwd,
+      env: options?.env ? { ...process.env, ...options.env } : process.env,
       stdio: ['inherit', 'pipe', 'pipe'],
     })
 

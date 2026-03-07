@@ -13,6 +13,9 @@ import {
   makeTempDir,
 } from './helpers/repo.ts'
 
+/** Environment for isolated git operations (ignores user's ~/.gitconfig) */
+const isolatedEnv = { GIT_CONFIG_GLOBAL: '/dev/null' }
+
 describe('migrate', () => {
   it('standard repo with extra worktree → hub layout', async () => {
     const src = makeTempDir()
@@ -83,16 +86,16 @@ describe('migrate', () => {
     // Create a standard repo with two branches that sanitize to the same name:
     // 'a/b' → 'a-b' and 'a-b' → 'a-b'
     // We use different worktree directory names to avoid the filesystem conflict.
-    await run('git', ['init', src], { quiet: true })
-    await run('git', ['-C', src, 'config', 'user.email', 'test@test.com'], { quiet: true })
-    await run('git', ['-C', src, 'config', 'user.name', 'Test'], { quiet: true })
-    await run('git', ['-C', src, 'commit', '--allow-empty', '-m', 'init'], { quiet: true })
+    await run('git', ['init', src], { quiet: true, env: isolatedEnv })
+    await run('git', ['-C', src, 'config', 'user.email', 'test@test.com'], { quiet: true, env: isolatedEnv })
+    await run('git', ['-C', src, 'config', 'user.name', 'Test'], { quiet: true, env: isolatedEnv })
+    await run('git', ['-C', src, 'commit', '--allow-empty', '-m', 'init'], { quiet: true, env: isolatedEnv })
     // Create first worktree with branch 'a/b' in dir 'wt1'
     const wt1 = join(src + '-wt1')
-    await run('git', ['-C', src, 'worktree', 'add', '-b', 'a/b', wt1], { quiet: true })
+    await run('git', ['-C', src, 'worktree', 'add', '-b', 'a/b', wt1], { quiet: true, env: isolatedEnv })
     // Create second worktree with branch 'a-b' in dir 'wt2'
     const wt2 = join(src + '-wt2')
-    await run('git', ['-C', src, 'worktree', 'add', '-b', 'a-b', wt2], { quiet: true })
+    await run('git', ['-C', src, 'worktree', 'add', '-b', 'a-b', wt2], { quiet: true, env: isolatedEnv })
 
     const config = await detect(src)
     const dest = src + '-hub'
@@ -136,8 +139,8 @@ describe('migrate', () => {
     await run('mv', ['-f', hotfixDest, hotfixOrig], { quiet: true })
     // Update the hub's worktree admin to point back to original paths so git
     // worktree list shows them as outside dest/.
-    await run('git', ['-C', dest, 'worktree', 'repair', featureOrig], { quiet: true })
-    await run('git', ['-C', dest, 'worktree', 'repair', hotfixOrig], { quiet: true })
+    await run('git', ['-C', dest, 'worktree', 'repair', featureOrig], { quiet: true, env: isolatedEnv })
+    await run('git', ['-C', dest, 'worktree', 'repair', hotfixOrig], { quiet: true, env: isolatedEnv })
 
     // Now simulate the user re-running on dest (which is the partial hub)
     expect(isPartialMigration(dest)).toBe(true)
@@ -205,7 +208,7 @@ describe('migrate', () => {
     const featureWrong   = join(subDir, 'feature')
     await run('mv', ['-f', featureCorrect, featureWrong], { quiet: true })
     // Update git's record so it knows about the new (wrong) location
-    await run('git', ['-C', dest, 'worktree', 'repair', featureWrong], { quiet: true })
+    await run('git', ['-C', dest, 'worktree', 'repair', featureWrong], { quiet: true, env: isolatedEnv })
 
     // resumeMigrate should detect feature is at dest/sub/feature (!= dest/feature)
     // and move it to dest/feature, fixing .git files
@@ -231,15 +234,15 @@ describe('migrate', () => {
     const base = join(tmp, 'expense')
     const sourceOrig = join(base, 'main')
     mkdirSync(sourceOrig, { recursive: true })
-    await run('git', ['init', sourceOrig], { quiet: true })
-    await run('git', ['-C', sourceOrig, 'config', 'user.email', 'test@test.com'], { quiet: true })
-    await run('git', ['-C', sourceOrig, 'config', 'user.name', 'Test'], { quiet: true })
-    await run('git', ['-C', sourceOrig, 'commit', '--allow-empty', '-m', 'init'], { quiet: true })
+    await run('git', ['init', '--initial-branch=main', sourceOrig], { quiet: true, env: isolatedEnv })
+    await run('git', ['-C', sourceOrig, 'config', 'user.email', 'test@test.com'], { quiet: true, env: isolatedEnv })
+    await run('git', ['-C', sourceOrig, 'config', 'user.name', 'Test'], { quiet: true, env: isolatedEnv })
+    await run('git', ['-C', sourceOrig, 'commit', '--allow-empty', '-m', 'init'], { quiet: true, env: isolatedEnv })
 
     // Add worktree inside base/ (sibling of 'main')
     const wtDir = join(base, 'main-worktrees', 'feature')
     mkdirSync(dirname(wtDir), { recursive: true })
-    await run('git', ['-C', sourceOrig, 'worktree', 'add', '-b', 'feature', wtDir], { quiet: true })
+    await run('git', ['-C', sourceOrig, 'worktree', 'add', '-b', 'feature', wtDir], { quiet: true, env: isolatedEnv })
 
     // Rename base/ → base.old/ (parent dir renamed, git paths now stale)
     const baseOld = join(tmp, 'expense.old')

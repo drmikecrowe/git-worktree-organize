@@ -3,6 +3,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { run } from './shell.ts'
 
+/** Environment for isolated git operations (ignores user's ~/.gitconfig) */
+const isolatedEnv = { GIT_CONFIG_GLOBAL: '/dev/null' }
+
 /** Create a temp directory and return its path. */
 export function makeTempDir(): string {
   return mkdtempSync(join(tmpdir(), 'git-worktree-organize-'))
@@ -13,14 +16,14 @@ export function makeTempDir(): string {
  * Adds extra worktrees for each branch name supplied in `branches`.
  */
 export async function makeStandardRepo(dir: string, branches: string[] = []): Promise<void> {
-  await run('git', ['init', dir], { quiet: true })
-  await run('git', ['-C', dir, 'config', 'user.email', 'test@test.com'], { quiet: true })
-  await run('git', ['-C', dir, 'config', 'user.name', 'Test'], { quiet: true })
-  await run('git', ['-C', dir, 'commit', '--allow-empty', '-m', 'init'], { quiet: true })
+  await run('git', ['init', '--initial-branch=main', dir], { quiet: true, env: isolatedEnv })
+  await run('git', ['-C', dir, 'config', 'user.email', 'test@test.com'], { quiet: true, env: isolatedEnv })
+  await run('git', ['-C', dir, 'config', 'user.name', 'Test'], { quiet: true, env: isolatedEnv })
+  await run('git', ['-C', dir, 'commit', '--allow-empty', '-m', 'init'], { quiet: true, env: isolatedEnv })
 
   for (const branch of branches) {
     const wtDir = join(dir + '-' + branch.replace(/\//g, '-'))
-    await run('git', ['-C', dir, 'worktree', 'add', '-b', branch, wtDir], { quiet: true })
+    await run('git', ['-C', dir, 'worktree', 'add', '-b', branch, wtDir], { quiet: true, env: isolatedEnv })
   }
 }
 
@@ -28,9 +31,9 @@ export async function makeStandardRepo(dir: string, branches: string[] = []): Pr
  * Create a bare repo at `dir` (clone --bare equivalent).
  */
 export async function makeBareRootRepo(dir: string): Promise<void> {
-  await run('git', ['init', '--bare', dir], { quiet: true })
-  await run('git', ['-C', dir, 'config', 'user.email', 'test@test.com'], { quiet: true })
-  await run('git', ['-C', dir, 'config', 'user.name', 'Test'], { quiet: true })
+  await run('git', ['init', '--bare', dir], { quiet: true, env: isolatedEnv })
+  await run('git', ['-C', dir, 'config', 'user.email', 'test@test.com'], { quiet: true, env: isolatedEnv })
+  await run('git', ['-C', dir, 'config', 'user.name', 'Test'], { quiet: true, env: isolatedEnv })
 }
 
 /**
@@ -39,9 +42,9 @@ export async function makeBareRootRepo(dir: string): Promise<void> {
 export async function makeBareHubRepo(dir: string): Promise<void> {
   const bareDir = join(dir, '.bare')
   mkdirSync(bareDir, { recursive: true })
-  await run('git', ['init', '--bare', bareDir], { quiet: true })
-  await run('git', ['-C', bareDir, 'config', 'user.email', 'test@test.com'], { quiet: true })
-  await run('git', ['-C', bareDir, 'config', 'user.name', 'Test'], { quiet: true })
+  await run('git', ['init', '--bare', bareDir], { quiet: true, env: isolatedEnv })
+  await run('git', ['-C', bareDir, 'config', 'user.email', 'test@test.com'], { quiet: true, env: isolatedEnv })
+  await run('git', ['-C', bareDir, 'config', 'user.name', 'Test'], { quiet: true, env: isolatedEnv })
   writeFileSync(join(dir, '.git'), 'gitdir: ./.bare\n')
 }
 
