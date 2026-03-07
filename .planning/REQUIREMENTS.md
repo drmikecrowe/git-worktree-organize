@@ -9,9 +9,9 @@ Requirements for Production Ready milestone. Each maps to roadmap phases.
 
 ### Runtime
 
-- [ ] **RUNTIME-01**: User can run all development commands with Node.js (no Bun required)
-- [ ] **RUNTIME-02**: Build produces Node.js-compatible output without Bun-specific APIs
-- [ ] **RUNTIME-03**: Package.json uses Node.js-compatible devDependencies only
+- [x] **RUNTIME-01**: User can run all development commands with Node.js (no Bun required)
+- [x] **RUNTIME-02**: Build produces Node.js-compatible output without Bun-specific APIs
+- [x] **RUNTIME-03**: Package.json uses Node.js-compatible devDependencies only
 
 ### Testing
 
@@ -74,9 +74,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RUNTIME-01 | Phase 1 | Pending |
-| RUNTIME-02 | Phase 1 | Pending |
-| RUNTIME-03 | Phase 1 | Pending |
+| RUNTIME-01 | Phase 1 | Done |
+| RUNTIME-02 | Phase 1 | Done |
+| RUNTIME-03 | Phase 1 | Done |
 | TEST-01 | Phase 2 | Pending |
 | TEST-02 | Phase 2 | Pending |
 | TEST-03 | Phase 2 | Pending |
@@ -102,4 +102,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-07*
-*Last updated: 2026-03-07 after roadmap creation*
+*Last updated: 2026-03-07 (Phase 1 complete)*

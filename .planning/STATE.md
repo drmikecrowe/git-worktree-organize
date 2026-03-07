@@ -17,10 +17,10 @@
 
 ## Current Position
 
-**Phase:** None (roadmap created, awaiting first phase plan)
-**Plan:** —
-**Status:** Ready to start
-**Progress:** `[                    ]` 0%
+**Phase:** 01-runtime-migration (completed)
+**Plan:** 01/01 complete
+**Status:** Phase 1 complete - ready for Phase 2
+**Progress:** `[====                ]` 20%
 
 ---
 
@@ -28,8 +28,8 @@
 
 | Metric | Value |
 |--------|-------|
-| Phases Completed | 0/5 |
-| Requirements Delivered | 0/20 |
+| Phases Completed | 1/5 |
+| Requirements Delivered | 3/20 |
 | Tests Passing | 34/34 (baseline) |
 | Days in Milestone | 0 |
 
@@ -55,6 +55,8 @@
 | 5-phase structure | Natural grouping: infrastructure first, then features | 2026-03-07 |
 | QUALITY split across phases | Refactoring before features (Phase 3), CLI tests with CLI features (Phase 5) | 2026-03-07 |
 | Worktree recovery before in-place | In-place migration needs robust worktree handling | 2026-03-07 |
+| npx esbuild over bun build | Removes Bun as build dependency, accessible to Node.js developers | 2026-03-07 |
+| esbuild --format=esm | Required for ESM compatibility with package.json "type": "module" | 2026-03-07 |
 
 ### Active Concerns
 
@@ -72,13 +74,13 @@ None.
 ### Last Session
 
 **Date:** 2026-03-07
-**Activity:** Roadmap creation for v1.1 milestone
-**Outcome:** 5-phase roadmap defined, 100% coverage validated
+**Activity:** Completed Phase 1 runtime migration plan
+**Outcome:** Build toolchain migrated from Bun to Node.js esbuild
 
 ### Next Steps
 
-1. Run `/gsd:plan-phase 1` to plan runtime migration
-2. Execute Phase 1 before moving to test migration
+1. Run `/gsd:plan-phase 2` to plan test migration
+2. Replace Bun `$` API with Node.js spawn in test helpers
 
 ---
 

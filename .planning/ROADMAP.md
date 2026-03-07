@@ -10,7 +10,7 @@ Transform git-worktree-organize into a production-grade CLI tool with simplified
 
 ## Phases
 
-- [ ] **Phase 1: Runtime Migration** - Remove Bun, standardize on Node.js
+- [x] **Phase 1: Runtime Migration** - Remove Bun, standardize on Node.js
 - [ ] **Phase 2: Test Migration** - Vitest only, remove dual-runtime complexity
 - [ ] **Phase 3: Code Quality** - Consolidate move logic, fix logging inconsistencies
 - [ ] **Phase 4: Worktree Recovery** - Find and repair missing worktrees instead of prune
@@ -118,7 +118,7 @@ Transform git-worktree-organize into a production-grade CLI tool with simplified
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Runtime Migration | 1/1 | Planned | - |
+| 1. Runtime Migration | 1/1 | Done | 2026-03-07 |
 | 2. Test Migration | 0/0 | Not started | - |
 | 3. Code Quality | 0/0 | Not started | - |
 | 4. Worktree Recovery | 0/0 | Not started | - |
@@ -130,9 +130,9 @@ Transform git-worktree-organize into a production-grade CLI tool with simplified
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RUNTIME-01 | Phase 1 | Pending |
-| RUNTIME-02 | Phase 1 | Pending |
-| RUNTIME-03 | Phase 1 | Pending |
+| RUNTIME-01 | Phase 1 | Done |
+| RUNTIME-02 | Phase 1 | Done |
+| RUNTIME-03 | Phase 1 | Done |
 | TEST-01 | Phase 2 | Pending |
 | TEST-02 | Phase 2 | Pending |
 | TEST-03 | Phase 2 | Pending |
@@ -156,4 +156,4 @@ Transform git-worktree-organize into a production-grade CLI tool with simplified
 ---
 
 *Roadmap created: 2026-03-07*
-*Last updated: 2026-03-07 (Phase 1 planned)*
+*Last updated: 2026-03-07 (Phase 1 complete)*
