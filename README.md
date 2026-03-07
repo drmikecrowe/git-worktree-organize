@@ -1,5 +1,7 @@
 # git-worktree-organize
 
+> ⚠️ **Use at your own risk.** This tool works for me and passes all tested scenarios, but it modifies your git repository structure. **Make a full backup first** before running on any repository you care about.
+
 Convert any git repository into the canonical bare-hub worktree layout, so every branch lives in its own directory and you never need to stash or switch again.
 
 ## What it does
