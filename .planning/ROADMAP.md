@@ -52,7 +52,7 @@ Transform git-worktree-organize into a production-grade CLI tool with simplified
 3. Test helper functions (makeTempDir, makeStandardRepo, etc.) work with Node.js only
 4. All 34+ existing tests pass after migration
 
-**Plans:** TBD
+**Plans:** 01 (3 tasks), 02 (4 tasks), 03 (4 tasks)
 
 ---
 
@@ -119,7 +119,7 @@ Transform git-worktree-organize into a production-grade CLI tool with simplified
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Runtime Migration | 1/1 | Done | 2026-03-07 |
-| 2. Test Migration | 0/0 | Not started | - |
+| 2. Test Migration | 0/3 | Planned | - |
 | 3. Code Quality | 0/0 | Not started | - |
 | 4. Worktree Recovery | 0/0 | Not started | - |
 | 5. CLI In-Place | 0/0 | Not started | - |
@@ -156,4 +156,4 @@ Transform git-worktree-organize into a production-grade CLI tool with simplified
 ---
 
 *Roadmap created: 2026-03-07*
-*Last updated: 2026-03-07 (Phase 1 complete)*
+*Last updated: 2026-03-07 (Phase 2 planned)*
