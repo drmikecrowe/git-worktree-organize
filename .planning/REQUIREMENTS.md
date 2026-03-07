@@ -30,8 +30,8 @@ Requirements for Production Ready milestone. Each maps to roadmap phases.
 
 ### CLI
 
-- [ ] **CLI-01**: User can run tool on existing hub directory to validate structure
-- [ ] **CLI-02**: Validation reports which worktrees are healthy, missing, or have stale pointers
+- [x] **CLI-01**: User can run tool on existing hub directory to validate structure
+- [x] **CLI-02**: Validation reports which worktrees are healthy, missing, or have stale pointers
 - [ ] **CLI-03**: User running tool on standard repo is prompted to migrate in-place
 - [ ] **CLI-04**: In-place migration renames source to `.old` before proceeding
 - [ ] **CLI-05**: In-place migration destination matches original source path
@@ -40,7 +40,7 @@ Requirements for Production Ready milestone. Each maps to roadmap phases.
 
 - [x] **QUALITY-01**: Move logic consolidated to single implementation in fs.ts
 - [x] **QUALITY-02**: All migrate functions use injected log callback (no console.warn)
-- [ ] **QUALITY-03**: CLI module has test coverage for user interaction flows
+- [x] **QUALITY-03**: CLI module has test coverage for user interaction flows
 
 ## v2 Requirements
 
@@ -88,12 +88,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WORKTREE-04 | Phase 4 | Done |
 | WORKTREE-05 | Phase 4 | Done |
 | WORKTREE-06 | Phase 4 | Pending |
-| CLI-01 | Phase 5 | Pending |
-| CLI-02 | Phase 5 | Pending |
+| CLI-01 | Phase 5 | Complete |
+| CLI-02 | Phase 5 | Complete |
 | CLI-03 | Phase 5 | Pending |
 | CLI-04 | Phase 5 | Pending |
 | CLI-05 | Phase 5 | Pending |
-| QUALITY-03 | Phase 5 | Pending |
+| QUALITY-03 | Phase 5 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 20 total

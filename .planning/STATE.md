@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-current_plan: Not started
-status: planning
-last_updated: "2026-03-07T19:13:26.509Z"
+current_plan: 05-02
+status: executing
+last_updated: "2026-03-07T20:15:00Z"
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 7
-  completed_plans: 7
+  completed_plans: 8
   percent: 100
 ---
 
@@ -32,10 +32,10 @@ progress:
 
 ## Current Position
 
-**Phase:** 04-worktree-recovery (in progress)
-**Current Plan:** Not started
+**Phase:** 05-cli-in-place (in progress)
+**Current Plan:** 05-02
 **Total Plans in Phase:** 2
-**Status:** Ready to plan
+**Status:** Ready to execute
 **Progress:** [██████████] 100%
 
 ---
@@ -44,12 +44,13 @@ progress:
 
 | Metric | Value |
 |--------|-------|
-| Phases Completed | 3/5 |
-| Requirements Delivered | 13/20 |
-| Tests Passing | 49/49 (baseline + shell helper + recovery) |
+| Phases Completed | 4/5 |
+| Requirements Delivered | 16/20 |
+| Tests Passing | 61/64 (validation mode + recovery + baseline) |
 | Days in Milestone | 0 |
 
 ---
+| Phase 05 P01 | 15m | 3 tasks | 2 files |
 | Phase 04 P01 | 4m | 3 tasks | 2 files |
 | Phase 03 P01 | 4m | 2 tasks | 3 files |
 | Phase 02 P03 | 21m | 4 tasks | 7 files |
@@ -85,6 +86,8 @@ progress:
 | Preserve admin name in repairWorktree | Realistic scenario where worktree moved but admin name preserved | 2026-03-07 |
 | Skip hidden dirs/node_modules/.git | Avoids false positives during worktree search | 2026-03-07 |
 | Return all valid candidates | Allows CLI to prompt user for selection when multiple matches | 2026-03-07 |
+| Validation mode routing | Check config.type === 'bare-hub' early in CLI to run validation | 2026-03-07 |
+| Integrated repair offer | Validation mode includes search-and-repair for missing/stale worktrees | 2026-03-07 |
 
 ### Active Concerns
 
@@ -101,13 +104,13 @@ None.
 ### Last Session
 
 **Date:** 2026-03-07
-**Activity:** Completed Phase 4 Plan 1 - Worktree recovery core functions
-**Outcome:** Implemented searchForWorktree, findMissingWorktrees, repairWorktree with full test coverage
+**Activity:** Completed Phase 5 Plan 1 - Validation Mode
+**Outcome:** Implemented runValidationMode() with status reporting and repair offer
 
 ### Next Steps
 
-1. Run `/gsd:plan-phase` to plan Phase 4 Plan 2 (CLI integration for recovery)
-2. Continue with worktree recovery feature
+1. Run `/gsd:execute-phase` to continue with Phase 5 Plan 2 (In-place migration)
+2. Continue with CLI improvements
 
 ---
 
