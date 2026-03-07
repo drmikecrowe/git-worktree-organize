@@ -1,0 +1,105 @@
+# Requirements: git-worktree-organize
+
+**Defined:** 2026-03-07
+**Core Value:** Every branch as a sibling directory — work on multiple branches simultaneously
+
+## v1.1 Requirements
+
+Requirements for Production Ready milestone. Each maps to roadmap phases.
+
+### Runtime
+
+- [ ] **RUNTIME-01**: User can run all development commands with Node.js (no Bun required)
+- [ ] **RUNTIME-02**: Build produces Node.js-compatible output without Bun-specific APIs
+- [ ] **RUNTIME-03**: Package.json uses Node.js-compatible devDependencies only
+
+### Testing
+
+- [ ] **TEST-01**: User can run all tests with `npm test` using Vitest only
+- [ ] **TEST-02**: Tests use Node.js-compatible shell execution (no Bun `$` API)
+- [ ] **TEST-03**: Test helper functions work without Bun runtime
+
+### Worktree Recovery
+
+- [ ] **WORKTREE-01**: Tool searches for missing worktrees under source directory
+- [ ] **WORKTREE-02**: Tool searches for missing worktrees under destination directory (if provided)
+- [ ] **WORKTREE-03**: Search traverses up to 3 levels deep (hub, immediate children, grandchildren)
+- [ ] **WORKTREE-04**: Tool matches directories to missing worktrees by sanitized branch name
+- [ ] **WORKTREE-05**: Tool repairs found worktrees by fixing .git pointer instead of pruning
+- [ ] **WORKTREE-06**: User sees which worktrees were found and repaired
+
+### CLI
+
+- [ ] **CLI-01**: User can run tool on existing hub directory to validate structure
+- [ ] **CLI-02**: Validation reports which worktrees are healthy, missing, or have stale pointers
+- [ ] **CLI-03**: User running tool on standard repo is prompted to migrate in-place
+- [ ] **CLI-04**: In-place migration renames source to `.old` before proceeding
+- [ ] **CLI-05**: In-place migration destination matches original source path
+
+### Quality
+
+- [ ] **QUALITY-01**: Move logic consolidated to single implementation in fs.ts
+- [ ] **QUALITY-02**: All migrate functions use injected log callback (no console.warn)
+- [ ] **QUALITY-03**: CLI module has test coverage for user interaction flows
+
+## v2 Requirements
+
+Deferred to future release. Tracked but not in current roadmap.
+
+### Quality
+
+- **QUAL-04**: Error path testing (permission errors, disk full, git failures)
+- **QUAL-05**: Verbose logging mode for troubleshooting
+
+### Features
+
+- **FEAT-01**: Dry-run mode to preview changes without executing
+- **FEAT-02**: Progress reporting for large repo migrations
+
+## Out of Scope
+
+Explicitly excluded. Documented to prevent scope creep.
+
+| Feature | Reason |
+|---------|--------|
+| `--force` flag | User wants explicit confirmation, not scripted bypass |
+| Windows support | Project is Unix-focused, no Windows testing available |
+| GUI interface | CLI is the product |
+| Git worktree creation | Only organizes existing worktrees, doesn't create new ones |
+| Parallel worktree processing | Sequential is simpler, performance not a concern |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| RUNTIME-01 | — | Pending |
+| RUNTIME-02 | — | Pending |
+| RUNTIME-03 | — | Pending |
+| TEST-01 | — | Pending |
+| TEST-02 | — | Pending |
+| TEST-03 | — | Pending |
+| WORKTREE-01 | — | Pending |
+| WORKTREE-02 | — | Pending |
+| WORKTREE-03 | — | Pending |
+| WORKTREE-04 | — | Pending |
+| WORKTREE-05 | — | Pending |
+| WORKTREE-06 | — | Pending |
+| CLI-01 | — | Pending |
+| CLI-02 | — | Pending |
+| CLI-03 | — | Pending |
+| CLI-04 | — | Pending |
+| CLI-05 | — | Pending |
+| QUALITY-01 | — | Pending |
+| QUALITY-02 | — | Pending |
+| QUALITY-03 | — | Pending |
+
+**Coverage:**
+- v1.1 requirements: 20 total
+- Mapped to phases: 0
+- Unmapped: 20 ⚠️
+
+---
+*Requirements defined: 2026-03-07*
+*Last updated: 2026-03-07 after initial definition*
