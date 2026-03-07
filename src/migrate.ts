@@ -159,6 +159,59 @@ export async function resumeMigrate(dest: string, log: (msg: string) => void = c
 }
 
 /**
+ * Migrate a standard repository in-place.
+ * Renames source to source.old, then creates the hub at the original source path.
+ * Returns the path to the created hub directory.
+ */
+export async function migrateInPlace(
+  source: string,
+  log: (msg: string) => void = console.log,
+  warn?: (msg: string) => void,
+): Promise<string> {
+  const resolvedSource = resolve(source)
+  const oldPath = resolvedSource + '.old'
+
+  // Check if .old already exists
+  if (existsSync(oldPath)) {
+    throw new Error(`'${oldPath}' already exists. Remove it and try again.`)
+  }
+
+  log(`Renaming ${bold(resolvedSource)} to ${bold(oldPath)}`)
+
+  // Rename source to .old
+  await move(resolvedSource, oldPath)
+
+  // Now migrate from oldPath to the original source path (in-place)
+  const config: RepoConfig = {
+    type: 'standard',
+    gitdir: join(oldPath, '.git'),
+    workdir: oldPath,
+  }
+
+  try {
+    const hubPath = await migrate(
+      config,
+      { source: oldPath, dest: resolvedSource },
+      log,
+      warn,
+    )
+
+    log(`Original repo backed up at: ${oldPath}`)
+
+    return hubPath
+  } catch (err) {
+    // On failure, leave .old as-is for manual recovery
+    warn?.(`Migration failed. Original repo preserved at: ${oldPath}`)
+    throw err
+  }
+}
+
+// Helper for bold text (needed for migrateInPlace log message)
+function bold(s: string): string {
+  return `\x1b[1m${s}\x1b[0m`
+}
+
+/**
  * Orchestrate the full migration of a git repo into the bare-hub layout.
  * Returns the path to the created hub directory.
  */

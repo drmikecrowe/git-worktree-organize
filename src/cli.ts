@@ -6,21 +6,23 @@
  */
 
 import { resolve, join, dirname, basename } from 'node:path'
-import { existsSync } from 'node:fs'
+import { existsSync, statSync, readFileSync } from 'node:fs'
 import { run } from './run.ts'
 import { detect } from './detect.ts'
-import { listWorktrees } from './worktrees.ts'
-import { migrate, resumeMigrate, repairHub, isPartialMigration, sanitizeBranch, resolveWorktreePath, findHub } from './migrate.ts'
+import { listWorktrees, type Worktree } from './worktrees.ts'
+import { migrate, resumeMigrate, repairHub, isPartialMigration, sanitizeBranch, resolveWorktreePath, findHub, migrateInPlace } from './migrate.ts'
 import { findMissingWorktrees, repairWorktree, type SearchResult } from './recover.ts'
 
 // ANSI color helpers
 const GREEN  = '\x1b[32m'
 const YELLOW = '\x1b[33m'
+const RED    = '\x1b[31m'
 const BOLD   = '\x1b[1m'
 const RESET  = '\x1b[0m'
 
 function green(s: string)  { return `${GREEN}${s}${RESET}` }
 function yellow(s: string) { return `${YELLOW}${s}${RESET}` }
+function red(s: string)    { return `${RED}${s}${RESET}` }
 function bold(s: string)   { return `${BOLD}${s}${RESET}` }
 
 function prompt(): Promise<string> {
@@ -28,6 +30,190 @@ function prompt(): Promise<string> {
     process.stdin.setEncoding('utf8')
     process.stdin.once('data', chunk => res(chunk.toString().trim()))
   })
+}
+
+/** Worktree status for validation mode */
+type WorktreeStatus = 'healthy' | 'missing' | 'stale'
+
+interface ValidatedWorktree {
+  worktree: Worktree
+  status: WorktreeStatus
+}
+
+/**
+ * Check if a worktree's .git file points to the correct admin directory.
+ */
+function isGitPointerValid(worktreePath: string, hubPath: string): boolean {
+  const gitFile = join(worktreePath, '.git')
+  if (!existsSync(gitFile) || !statSync(gitFile).isFile()) {
+    return false
+  }
+
+  const content = readFileSync(gitFile, 'utf8')
+  const match = content.match(/^gitdir:\s*(.+)$/m)
+  if (!match) {
+    return false
+  }
+
+  const gitdir = match[1].trim()
+  const bareDir = join(hubPath, '.bare')
+
+  // Check if gitdir points inside the hub's .bare/worktrees directory
+  return gitdir.includes(bareDir) && gitdir.includes('/worktrees/')
+}
+
+/**
+ * Run validation mode on an existing bare-hub repository.
+ * Reports the status of all worktrees: healthy, missing, or stale.
+ * If any missing or stale worktrees exist, offers to search and repair them.
+ */
+async function runValidationMode(hubPath: string): Promise<void> {
+  const worktrees = await listWorktrees(hubPath)
+  const validated: ValidatedWorktree[] = []
+
+  for (const wt of worktrees) {
+    if (wt.isBare) continue
+
+    let status: WorktreeStatus
+    if (!existsSync(wt.path)) {
+      status = 'missing'
+    } else if (!isGitPointerValid(wt.path, hubPath)) {
+      status = 'stale'
+    } else {
+      status = 'healthy'
+    }
+
+    validated.push({ worktree: wt, status })
+  }
+
+  // Print validation report
+  console.log()
+  console.log(bold('Validation Report'))
+  console.log(`Hub: ${hubPath}`)
+  console.log()
+
+  if (validated.length === 0) {
+    console.log('No worktrees found.')
+    return
+  }
+
+  // Find max branch name length for alignment
+  const maxBranchLen = validated.reduce((m, v) => {
+    const branch = v.worktree.branch ?? `detached-${v.worktree.head.slice(0, 8)}`
+    return Math.max(m, branch.length)
+  }, 0)
+
+  // Print table header
+  const headerBranch = 'Branch'.padEnd(maxBranchLen)
+  const headerStatus = 'Status'
+  const headerPath = 'Path'
+  console.log(`  ${bold(headerBranch)}  ${bold(headerStatus.padEnd(7))}  ${bold(headerPath)}`)
+
+  // Print each worktree
+  const counts = { healthy: 0, missing: 0, stale: 0 }
+  for (const v of validated) {
+    const branch = v.worktree.branch ?? `detached-${v.worktree.head.slice(0, 8)}`
+    const branchCol = branch.padEnd(maxBranchLen)
+
+    let statusCol: string
+    if (v.status === 'healthy') {
+      statusCol = green('healthy')
+      counts.healthy++
+    } else if (v.status === 'missing') {
+      statusCol = red('missing')
+      counts.missing++
+    } else {
+      statusCol = yellow('stale')
+      counts.stale++
+    }
+
+    console.log(`  ${branchCol}  ${statusCol.padEnd(7 + (statusCol.length - v.status.length))}  ${v.worktree.path}`)
+  }
+
+  // Print summary
+  console.log()
+  const summaryParts: string[] = []
+  if (counts.healthy > 0) summaryParts.push(`${counts.healthy} healthy`)
+  if (counts.missing > 0) summaryParts.push(`${counts.missing} missing`)
+  if (counts.stale > 0) summaryParts.push(`${counts.stale} stale`)
+  console.log(`Summary: ${summaryParts.join(', ')}`)
+
+  // Offer repair for missing/stale worktrees
+  const needsRepair = validated.filter(v => v.status === 'missing' || v.status === 'stale')
+  if (needsRepair.length === 0) {
+    return
+  }
+
+  console.log()
+  console.log(`${yellow('warn:')} ${needsRepair.length} worktree(s) need repair.`)
+
+  // Search for missing worktrees
+  const searchDirs = [dirname(hubPath)]
+  console.log(`${green('==>')} Searching for missing worktrees...`)
+  const results = await findMissingWorktrees(
+    hubPath,
+    searchDirs,
+    msg => console.log(`    ${msg}`)
+  )
+
+  // Display results
+  const found = results.filter(r => r.candidates.length > 0)
+  const notFound = results.filter(r => r.candidates.length === 0)
+  const multiple = results.filter(r => r.candidates.length > 1)
+
+  if (notFound.length > 0) {
+    console.log(`\n${yellow('Not found:')}`)
+    for (const r of notFound) {
+      console.log(`  [${r.branch}]`)
+    }
+  }
+
+  if (found.length === 0) {
+    console.log(`\nNo worktrees could be located. Consider pruning them with 'git worktree prune'.`)
+    return
+  }
+
+  // Handle multiple matches with user selection
+  const selections: Map<string, string> = new Map()
+  for (const r of multiple) {
+    console.log(`\n${bold(`[${r.branch}]`)} has multiple candidates:`)
+    for (let i = 0; i < r.candidates.length; i++) {
+      console.log(`  ${i + 1}) ${r.candidates[i]}`)
+    }
+    process.stdout.write(`Select which to use (1-${r.candidates.length}) [skip]: `)
+    const sel = await prompt()
+    const idx = parseInt(sel) - 1
+    if (idx >= 0 && idx < r.candidates.length) {
+      selections.set(r.branch, r.candidates[idx])
+    }
+  }
+
+  // Display found worktrees in table format
+  console.log(`\n${green('Found:')}`)
+  const maxFoundBranchLen = found.reduce((m, r) => Math.max(m, r.branch.length), 0)
+  for (const r of found) {
+    const path = selections.get(r.branch) ?? r.candidates[0]
+    const branchCol = bold(`[${r.branch}]`).padEnd(maxFoundBranchLen + 2 + BOLD.length + RESET.length)
+    console.log(`  ${branchCol}  ${path}`)
+  }
+
+  // Batch confirmation
+  console.log()
+  process.stdout.write('Repair these worktrees? [y/N] ')
+  const repairAns = await prompt()
+  process.stdin.destroy()
+  if (!/^[Yy]$/.test(repairAns)) {
+    console.log('Aborted.')
+    return
+  }
+
+  // Perform repairs
+  console.log()
+  for (const r of found) {
+    const path = selections.get(r.branch) ?? r.candidates[0]
+    await repairWorktree(path, hubPath, msg => console.log(`${green('==>')} ${msg}`))
+  }
+  console.log(`${green('==>')} Repaired ${found.length} worktree(s).`)
 }
 
 function usage(): void {
@@ -67,6 +253,15 @@ async function main(): Promise<void> {
     : destArg
       ? resolve(destArg)
       : join(dirname(source), basename(source) + '-bare')
+
+  // ── Validation mode for bare-hub ─────────────────────────────────────────────
+  // If the repo is already a bare-hub, run validation mode instead of migration
+  const config = await detect(source)
+  if (config.type === 'bare-hub') {
+    await runValidationMode(source)
+    process.exit(0)
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   // ── Source is a worktree inside an existing hub? → offer .git repair ────────
   // When the user provides a path that is not a hub itself but sits inside one
@@ -205,7 +400,8 @@ async function main(): Promise<void> {
     }
 
     if (pending.length === 0) {
-      console.log('All worktrees are already in place — nothing to resume.')
+      // All worktrees are in expected locations - run validation mode
+      await runValidationMode(dest)
       process.exit(0)
     }
 
@@ -241,9 +437,50 @@ async function main(): Promise<void> {
 
   console.log(`\n${green('==>')} Reading worktrees from ${source}\n`)
 
-  // Detect repo type and list worktrees for display
-  const config = await detect(source)
+  // List worktrees for display
   const allWorktrees = await listWorktrees(source)
+
+  // ── In-place migration? ────────────────────────────────────────────────────
+  // For standard repos without a destination arg, offer in-place migration.
+  // This renames the source to .old and creates the hub at the original path.
+  if (config.type === 'standard' && !destArg) {
+    const repoName = basename(source)
+    console.log(`No destination specified. Migrate in-place?`)
+    console.log(`This will rename '${bold(repoName)}' to '${bold(repoName + '.old')}' and create the hub here.`)
+    console.log()
+    process.stdout.write('Proceed with in-place migration? [y/N] ')
+    const inPlaceAns = await prompt()
+    process.stdin.destroy()
+
+    if (!/^[Yy]$/.test(inPlaceAns)) {
+      console.log('Aborted.')
+      console.log('Tip: Specify a destination directory to migrate to a new location.')
+      process.exit(0)
+    }
+
+    console.log()
+
+    // Run in-place migration
+    const hubPath = await migrateInPlace(
+      source,
+      msg => console.log(`${green('==>')} ${msg}`),
+      msg => console.log(`${yellow('warn:')} ${msg}`),
+    )
+
+    // Verify
+    console.log(`${green('==>')} Verifying with git worktree list...`)
+    const verifyOutput = run('git', ['-C', hubPath, 'worktree', 'list']).stdout
+    console.log(verifyOutput)
+
+    console.log(`Done! Hub: ${hubPath}`)
+    console.log(`Backup: ${source}.old`)
+    console.log()
+    console.log('Useful commands:')
+    console.log(`  git -C ${hubPath} worktree list`)
+    console.log(`  git -C ${hubPath}/main log --oneline -5`)
+    process.exit(0)
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   // ── Missing worktrees? Search and repair instead of prune ─────────────────
   // Check for worktrees whose paths no longer exist and search for them.
