@@ -74,32 +74,32 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RUNTIME-01 | — | Pending |
-| RUNTIME-02 | — | Pending |
-| RUNTIME-03 | — | Pending |
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
-| TEST-03 | — | Pending |
-| WORKTREE-01 | — | Pending |
-| WORKTREE-02 | — | Pending |
-| WORKTREE-03 | — | Pending |
-| WORKTREE-04 | — | Pending |
-| WORKTREE-05 | — | Pending |
-| WORKTREE-06 | — | Pending |
-| CLI-01 | — | Pending |
-| CLI-02 | — | Pending |
-| CLI-03 | — | Pending |
-| CLI-04 | — | Pending |
-| CLI-05 | — | Pending |
-| QUALITY-01 | — | Pending |
-| QUALITY-02 | — | Pending |
-| QUALITY-03 | — | Pending |
+| RUNTIME-01 | Phase 1 | Pending |
+| RUNTIME-02 | Phase 1 | Pending |
+| RUNTIME-03 | Phase 1 | Pending |
+| TEST-01 | Phase 2 | Pending |
+| TEST-02 | Phase 2 | Pending |
+| TEST-03 | Phase 2 | Pending |
+| QUALITY-01 | Phase 3 | Pending |
+| QUALITY-02 | Phase 3 | Pending |
+| WORKTREE-01 | Phase 4 | Pending |
+| WORKTREE-02 | Phase 4 | Pending |
+| WORKTREE-03 | Phase 4 | Pending |
+| WORKTREE-04 | Phase 4 | Pending |
+| WORKTREE-05 | Phase 4 | Pending |
+| WORKTREE-06 | Phase 4 | Pending |
+| CLI-01 | Phase 5 | Pending |
+| CLI-02 | Phase 5 | Pending |
+| CLI-03 | Phase 5 | Pending |
+| CLI-04 | Phase 5 | Pending |
+| CLI-05 | Phase 5 | Pending |
+| QUALITY-03 | Phase 5 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 20 total
-- Mapped to phases: 0
-- Unmapped: 20 ⚠️
+- Mapped to phases: 20
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-07*
-*Last updated: 2026-03-07 after initial definition*
+*Last updated: 2026-03-07 after roadmap creation*
