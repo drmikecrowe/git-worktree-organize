@@ -21,11 +21,11 @@ Requirements for Production Ready milestone. Each maps to roadmap phases.
 
 ### Worktree Recovery
 
-- [ ] **WORKTREE-01**: Tool searches for missing worktrees under source directory
-- [ ] **WORKTREE-02**: Tool searches for missing worktrees under destination directory (if provided)
-- [ ] **WORKTREE-03**: Search traverses up to 3 levels deep (hub, immediate children, grandchildren)
-- [ ] **WORKTREE-04**: Tool matches directories to missing worktrees by sanitized branch name
-- [ ] **WORKTREE-05**: Tool repairs found worktrees by fixing .git pointer instead of pruning
+- [x] **WORKTREE-01**: Tool searches for missing worktrees under source directory
+- [x] **WORKTREE-02**: Tool searches for missing worktrees under destination directory (if provided)
+- [x] **WORKTREE-03**: Search traverses up to 3 levels deep (hub, immediate children, grandchildren)
+- [x] **WORKTREE-04**: Tool matches directories to missing worktrees by sanitized branch name
+- [x] **WORKTREE-05**: Tool repairs found worktrees by fixing .git pointer instead of pruning
 - [ ] **WORKTREE-06**: User sees which worktrees were found and repaired
 
 ### CLI
@@ -77,16 +77,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RUNTIME-01 | Phase 1 | Done |
 | RUNTIME-02 | Phase 1 | Done |
 | RUNTIME-03 | Phase 1 | Done |
-| TEST-01 | Phase 2 | Complete |
+| TEST-01 | Phase 2 | Done |
 | TEST-02 | Phase 2 | Done |
 | TEST-03 | Phase 2 | Done |
-| QUALITY-01 | Phase 3 | Complete |
-| QUALITY-02 | Phase 3 | Complete |
-| WORKTREE-01 | Phase 4 | Pending |
-| WORKTREE-02 | Phase 4 | Pending |
-| WORKTREE-03 | Phase 4 | Pending |
-| WORKTREE-04 | Phase 4 | Pending |
-| WORKTREE-05 | Phase 4 | Pending |
+| QUALITY-01 | Phase 3 | Done |
+| QUALITY-02 | Phase 3 | Done |
+| WORKTREE-01 | Phase 4 | Done |
+| WORKTREE-02 | Phase 4 | Done |
+| WORKTREE-03 | Phase 4 | Done |
+| WORKTREE-04 | Phase 4 | Done |
+| WORKTREE-05 | Phase 4 | Done |
 | WORKTREE-06 | Phase 4 | Pending |
 | CLI-01 | Phase 5 | Pending |
 | CLI-02 | Phase 5 | Pending |
@@ -102,4 +102,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-03-07*
-*Last updated: 2026-03-07 (Phase 1 complete)*
+*Last updated: 2026-03-07 (Phase 4 Plan 1 complete)*
