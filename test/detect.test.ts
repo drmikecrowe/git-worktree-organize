@@ -1,7 +1,7 @@
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { $ } from 'bun'
+import { run } from './helpers/shell.ts'
 import { describe, it, expect } from 'vitest'
 import { detect } from '../src/detect.ts'
 
@@ -10,15 +10,15 @@ function tempDir() {
 }
 
 async function makeCommit(dir: string) {
-  await $`git -C ${dir} config user.email "test@test.com"`.quiet()
-  await $`git -C ${dir} config user.name "Test"`.quiet()
-  await $`git -C ${dir} commit --allow-empty -m "init"`.quiet()
+  await run('git', ['-C', dir, 'config', 'user.email', 'test@test.com'], { quiet: true })
+  await run('git', ['-C', dir, 'config', 'user.name', 'Test'], { quiet: true })
+  await run('git', ['-C', dir, 'commit', '--allow-empty', '-m', 'init'], { quiet: true })
 }
 
 describe('detect', () => {
   it('standard: git init + commit → type standard', async () => {
     const dir = tempDir()
-    await $`git -C ${dir} init`.quiet()
+    await run('git', ['-C', dir, 'init'], { quiet: true })
     await makeCommit(dir)
 
     const result = await detect(dir)
@@ -31,7 +31,7 @@ describe('detect', () => {
 
   it('bare-root: git init --bare → type bare-root', async () => {
     const dir = tempDir()
-    await $`git -C ${dir} init --bare`.quiet()
+    await run('git', ['-C', dir, 'init', '--bare'], { quiet: true })
 
     const result = await detect(dir)
     expect(result).toEqual({
@@ -42,9 +42,9 @@ describe('detect', () => {
 
   it('bare-dotgit: git init + core.bare=true → type bare-dotgit', async () => {
     const dir = tempDir()
-    await $`git -C ${dir} init`.quiet()
+    await run('git', ['-C', dir, 'init'], { quiet: true })
     // Set core.bare = true in .git/config
-    await $`git -C ${dir} config core.bare true`.quiet()
+    await run('git', ['-C', dir, 'config', 'core.bare', 'true'], { quiet: true })
 
     const result = await detect(dir)
     expect(result).toEqual({
@@ -57,7 +57,7 @@ describe('detect', () => {
     const dir = tempDir()
     const bareDir = join(dir, '.bare')
     mkdirSync(bareDir)
-    await $`git -C ${bareDir} init --bare`.quiet()
+    await run('git', ['-C', bareDir, 'init', '--bare'], { quiet: true })
     writeFileSync(join(dir, '.git'), 'gitdir: ./.bare\n')
 
     const result = await detect(dir)
@@ -71,7 +71,7 @@ describe('detect', () => {
     const dir = tempDir()
     const extDir = join(dir, 'extgit')
     mkdirSync(extDir)
-    await $`git -C ${extDir} init --bare`.quiet()
+    await run('git', ['-C', extDir, 'init', '--bare'], { quiet: true })
     writeFileSync(join(dir, '.git'), 'gitdir: ./extgit\n')
 
     const result = await detect(dir)
@@ -84,9 +84,9 @@ describe('detect', () => {
   it('reject linked worktree: detect on worktree dir throws', async () => {
     const mainDir = tempDir()
     const wtDir = join(tempDir(), 'wt')
-    await $`git -C ${mainDir} init`.quiet()
+    await run('git', ['-C', mainDir, 'init'], { quiet: true })
     await makeCommit(mainDir)
-    await $`git -C ${mainDir} worktree add ${wtDir}`.quiet()
+    await run('git', ['-C', mainDir, 'worktree', 'add', wtDir], { quiet: true })
 
     await expect(detect(wtDir)).rejects.toThrow('linked worktree')
   })
