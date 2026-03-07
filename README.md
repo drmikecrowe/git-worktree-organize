@@ -11,7 +11,7 @@ Takes an existing git repo (any type) and migrates it into this structure:
 ├── .bare/       ← bare git repo (the actual git database)
 ├── .git         ← plain file: "gitdir: ./.bare"
 ├── main/        ← worktree for the main branch
-└── feature-x/  ← worktree for each other branch
+└── feature-x/   ← worktree for each other branch
 ```
 
 Each branch directory is a fully functional working tree. Open them in separate terminals or IDE windows simultaneously — no stashing, no switching.
@@ -67,27 +67,9 @@ The original `/projects/myrepo` is moved to `/projects/myrepo-bare/main/`. No da
 
 ## Features
 
-- **Migrate existing repos** — Convert any git repository type to the bare-hub layout
-- **Fix worktree locations** — Resume interrupted migrations or fix worktrees that moved
-- **Handle parent directory renames** — Automatically detect and fix stale worktree paths when parent directories are renamed
-- **Convert to .bare layout** — Transform standard checkouts into the canonical bare-hub structure
-- **Worktree recovery** — Find and repair worktrees at unexpected locations
+### Repository Migration
 
-## Recovery and Resume
-
-If a migration was interrupted or worktrees have moved, running the tool on the hub directory will:
-
-1. Detect worktrees at incorrect locations
-2. Move them to the correct location within the hub
-3. Repair `.git` pointer files
-4. Fix stale git administrative data
-
-This handles common scenarios:
-- Renaming the parent directory of a hub
-- Partial migrations that failed midway
-- Worktrees that were manually moved
-
-## Supported repo types
+Convert any git repository type to the bare-hub layout:
 
 - **Standard repos** — ordinary repos with a `.git` directory
 - **Bare-root** — bare repo with git internals at the root (`HEAD`, `refs/`, `objects/`)
@@ -95,11 +77,80 @@ This handles common scenarios:
 - **Bare-external** — repo where `.git` is a file pointing to a gitdir elsewhere
 - **Bare-hub** — already in the bare-hub layout (re-organizes worktrees into the canonical structure)
 
-Branch names with slashes (e.g. `feature/auth`) are mapped to hyphenated directory names (`feature-auth`).
+### Resume & Recovery
+
+If a migration was interrupted or worktrees have moved, running the tool on the hub directory will:
+
+1. **Resume partial migrations** — Continue moving worktrees that weren't fully processed
+2. **Repair stale `.git` pointers** — Fix worktrees with broken connections to the bare repo
+3. **Search for missing worktrees** — Find worktrees that were moved outside the hub (searches up to 3 directory levels deep)
+4. **Fix parent directory renames** — Automatically detect and repair when a hub's parent directory was renamed
+
+### Safety Features
+
+- **Interactive confirmation** — Preview all changes before execution
+- **Branch name sanitization** — Names with slashes (e.g. `feature/auth`) become hyphenated directories (`feature-auth`)
+- **Collision detection** — Warns if sanitized names would conflict
+- **Zero runtime dependencies** — Only requires Node.js and git
+
+## Recovery Scenarios
+
+### Partial Migration
+
+If migration was interrupted:
+
+```sh
+git-worktree-organize /path/to/hub
+```
+
+The tool detects the partial state, shows which worktrees still need to be moved, and offers to resume.
+
+### Moved Worktrees
+
+If worktrees were manually moved outside the hub:
+
+```sh
+git-worktree-organize /path/to/hub
+```
+
+The tool searches for missing worktrees by branch name and offers to repair their `.git` pointers.
+
+### Parent Directory Rename
+
+If you renamed a parent directory, worktree `.git` files will have stale paths. Run the tool on any worktree path inside the hub:
+
+```sh
+git-worktree-organize /new/path/to/hub/some-worktree
+```
+
+The tool detects the hub, navigates to it, and repairs all worktree connections.
 
 ## Why this layout
 
 Having every branch as a sibling directory means you can work on multiple branches simultaneously without stashing or switching. It is also easier to run branch-specific build artifacts side by side, and the `.git` file at the hub root ensures IDE and tooling compatibility without any special configuration.
+
+## Requirements
+
+- Node.js 18+
+- Git 2.5+ (for worktree support)
+
+## Development
+
+```sh
+# Clone and install
+git clone https://github.com/drmikecrowe/git-worktree-organize.git
+cd git-worktree-organize
+npm install
+
+# Run tests
+npm test
+
+# Build
+npm run build
+
+# Test locally
+node dist/cli.js /path/to/test/repo
+```
 
 ## License
 
