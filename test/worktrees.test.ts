@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { $ } from 'bun'
+import { run } from './helpers/shell.ts'
 import { parsePorcelain, listWorktrees } from '../src/worktrees'
 
 describe('parsePorcelain', () => {
@@ -134,15 +134,15 @@ describe('listWorktrees', () => {
     const linkedDir = join(tmpDir, 'linked')
 
     // Initialize a git repo with an initial commit
-    await $`git init ${repoDir}`.quiet()
-    await $`git -C ${repoDir} config user.email test@example.com`.quiet()
-    await $`git -C ${repoDir} config user.name Test`.quiet()
-    await $`touch ${join(repoDir, 'README')}`.quiet()
-    await $`git -C ${repoDir} add README`.quiet()
-    await $`git -C ${repoDir} commit -m init`.quiet()
+    await run('git', ['init', repoDir], { quiet: true })
+    await run('git', ['-C', repoDir, 'config', 'user.email', 'test@example.com'], { quiet: true })
+    await run('git', ['-C', repoDir, 'config', 'user.name', 'Test'], { quiet: true })
+    await run('touch', [join(repoDir, 'README')], { quiet: true })
+    await run('git', ['-C', repoDir, 'add', 'README'], { quiet: true })
+    await run('git', ['-C', repoDir, 'commit', '-m', 'init'], { quiet: true })
 
     // Add a linked worktree on a new branch
-    await $`git -C ${repoDir} worktree add -b feature ${linkedDir}`.quiet()
+    await run('git', ['-C', repoDir, 'worktree', 'add', '-b', 'feature', linkedDir], { quiet: true })
 
     const worktrees = await listWorktrees(repoDir)
 
