@@ -11,10 +11,10 @@ Transform git-worktree-organize into a production-grade CLI tool with simplified
 ## Phases
 
 - [x] **Phase 1: Runtime Migration** - Remove Bun, standardize on Node.js
-- [ ] **Phase 2: Test Migration** - Vitest only, remove dual-runtime complexity
-- [ ] **Phase 3: Code Quality** - Consolidate move logic, fix logging inconsistencies
-- [ ] **Phase 4: Worktree Recovery** - Find and repair missing worktrees instead of prune
-- [ ] **Phase 5: CLI In-Place** - In-place operation with validation mode
+- [x] **Phase 2: Test Migration** - Vitest only, remove dual-runtime complexity
+- [x] **Phase 3: Code Quality** - Consolidate move logic, fix logging inconsistencies
+- [x] **Phase 4: Worktree Recovery** - Find and repair missing worktrees instead of prune
+- [x] **Phase 5: CLI In-Place** - In-place operation with validation mode
 
 ---
 
@@ -121,8 +121,8 @@ Transform git-worktree-organize into a production-grade CLI tool with simplified
 | 1. Runtime Migration | 1/1 | Done | 2026-03-07 |
 | 2. Test Migration | 3/3 | Done | 2026-03-07 |
 | 3. Code Quality | 1/1 | Done | 2026-03-07 |
-| 4. Worktree Recovery | 1/2 | In Progress | - |
-| 5. CLI In-Place | 0/0 | Not started | - |
+| 4. Worktree Recovery | 2/2 | Done | 2026-03-07 |
+| 5. CLI In-Place | 2/2 | Done | 2026-03-07 |
 
 ---
 
@@ -143,13 +143,13 @@ Transform git-worktree-organize into a production-grade CLI tool with simplified
 | WORKTREE-03 | Phase 4 | Done |
 | WORKTREE-04 | Phase 4 | Done |
 | WORKTREE-05 | Phase 4 | Done |
-| WORKTREE-06 | Phase 4 | Pending |
-| CLI-01 | Phase 5 | Pending |
-| CLI-02 | Phase 5 | Pending |
-| CLI-03 | Phase 5 | Pending |
-| CLI-04 | Phase 5 | Pending |
-| CLI-05 | Phase 5 | Pending |
-| QUALITY-03 | Phase 5 | Pending |
+| WORKTREE-06 | Phase 4 | Done |
+| CLI-01 | Phase 5 | Done |
+| CLI-02 | Phase 5 | Done |
+| CLI-03 | Phase 5 | Done |
+| CLI-04 | Phase 5 | Done |
+| CLI-05 | Phase 5 | Done |
+| QUALITY-03 | Phase 5 | Done |
 
 **Coverage:** 20/20 requirements mapped (100%)
 

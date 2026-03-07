@@ -26,7 +26,7 @@ Requirements for Production Ready milestone. Each maps to roadmap phases.
 - [x] **WORKTREE-03**: Search traverses up to 3 levels deep (hub, immediate children, grandchildren)
 - [x] **WORKTREE-04**: Tool matches directories to missing worktrees by sanitized branch name
 - [x] **WORKTREE-05**: Tool repairs found worktrees by fixing .git pointer instead of pruning
-- [ ] **WORKTREE-06**: User sees which worktrees were found and repaired
+- [x] **WORKTREE-06**: User sees which worktrees were found and repaired
 
 ### CLI
 
@@ -87,7 +87,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WORKTREE-03 | Phase 4 | Done |
 | WORKTREE-04 | Phase 4 | Done |
 | WORKTREE-05 | Phase 4 | Done |
-| WORKTREE-06 | Phase 4 | Pending |
+| WORKTREE-06 | Phase 4 | Done |
 | CLI-01 | Phase 5 | Complete |
 | CLI-02 | Phase 5 | Complete |
 | CLI-03 | Phase 5 | Complete |
