@@ -65,6 +65,28 @@ Result:
 
 The original `/projects/myrepo` is moved to `/projects/myrepo-bare/main/`. No data is lost.
 
+## Features
+
+- **Migrate existing repos** — Convert any git repository type to the bare-hub layout
+- **Fix worktree locations** — Resume interrupted migrations or fix worktrees that moved
+- **Handle parent directory renames** — Automatically detect and fix stale worktree paths when parent directories are renamed
+- **Convert to .bare layout** — Transform standard checkouts into the canonical bare-hub structure
+- **Worktree recovery** — Find and repair worktrees at unexpected locations
+
+## Recovery and Resume
+
+If a migration was interrupted or worktrees have moved, running the tool on the hub directory will:
+
+1. Detect worktrees at incorrect locations
+2. Move them to the correct location within the hub
+3. Repair `.git` pointer files
+4. Fix stale git administrative data
+
+This handles common scenarios:
+- Renaming the parent directory of a hub
+- Partial migrations that failed midway
+- Worktrees that were manually moved
+
 ## Supported repo types
 
 - **Standard repos** — ordinary repos with a `.git` directory
