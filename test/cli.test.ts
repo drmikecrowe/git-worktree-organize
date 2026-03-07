@@ -9,10 +9,10 @@
  * the CLI triggers the right behaviors.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { join, dirname } from 'node:path'
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { join, dirname, basename } from 'node:path'
+import { mkdirSync, rmSync, writeFileSync, existsSync, statSync, readdirSync } from 'node:fs'
 import { spawn } from 'node:child_process'
-import { makeTempDir, makeBareHubRepo } from './helpers/repo.ts'
+import { makeTempDir, makeBareHubRepo, makeStandardRepo, assertHubStructure } from './helpers/repo.ts'
 import { run } from './helpers/shell.ts'
 
 /** Environment for isolated git operations (ignores user's ~/.gitconfig) */
@@ -95,6 +95,91 @@ async function runCli(
     })
   })
 }
+
+describe('cli validation mode', () => {
+  let tempDir: string
+
+  beforeEach(() => {
+    tempDir = makeTempDir()
+  })
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  it('detects bare-hub and runs validation', async () => {
+    const hubDir = join(tempDir, 'myproject-bare')
+    await makeHubWithCommit(hubDir)
+
+    const { output, exitCode } = await runCli([hubDir])
+
+    // Should show validation report
+    expect(output).toContain('Validation Report')
+    expect(output).toContain('main')
+    expect(exitCode).toBe(0)
+  })
+
+  it('reports healthy worktrees', async () => {
+    const hubDir = join(tempDir, 'project-bare')
+    await makeHubWithCommit(hubDir)
+
+    const { output } = await runCli([hubDir])
+
+    expect(output).toContain('healthy')
+  })
+
+  it('reports missing worktrees', async () => {
+    const hubDir = join(tempDir, 'project-bare')
+    await makeHubWithCommit(hubDir)
+
+    // Create another worktree and then delete it
+    const featureWt = join(hubDir, 'feature-x')
+    await run('git', ['-C', hubDir, 'worktree', 'add', '-b', 'feature-x', featureWt], { quiet: true, env: isolatedEnv })
+    rmSync(featureWt, { recursive: true, force: true })
+
+    const { output } = await runCli([hubDir])
+
+    expect(output).toContain('missing')
+    expect(output).toContain('feature-x')
+  })
+
+  it('reports stale worktrees', async () => {
+    const hubDir = join(tempDir, 'project-bare')
+    await makeHubWithCommit(hubDir)
+
+    // Create another worktree and corrupt its .git file
+    const featureWt = join(hubDir, 'feature-y')
+    await run('git', ['-C', hubDir, 'worktree', 'add', '-b', 'feature-y', featureWt], { quiet: true, env: isolatedEnv })
+    writeFileSync(join(featureWt, '.git'), 'gitdir: /wrong/path\n')
+
+    const { output } = await runCli([hubDir])
+
+    expect(output).toContain('stale')
+    expect(output).toContain('feature-y')
+  })
+
+  it('shows summary counts', async () => {
+    const hubDir = join(tempDir, 'project-bare')
+    await makeHubWithCommit(hubDir)
+
+    // Create a missing worktree
+    const missingWt = join(hubDir, 'missing-branch')
+    await run('git', ['-C', hubDir, 'worktree', 'add', '-b', 'missing-branch', missingWt], { quiet: true, env: isolatedEnv })
+    rmSync(missingWt, { recursive: true, force: true })
+
+    // Create a stale worktree
+    const staleWt = join(hubDir, 'stale-branch')
+    await run('git', ['-C', hubDir, 'worktree', 'add', '-b', 'stale-branch', staleWt], { quiet: true, env: isolatedEnv })
+    writeFileSync(join(staleWt, '.git'), 'gitdir: /wrong/path\n')
+
+    const { output } = await runCli([hubDir])
+
+    // Should show counts: 1 healthy, 1 missing, 1 stale
+    expect(output).toContain('1 healthy')
+    expect(output).toContain('1 missing')
+    expect(output).toContain('1 stale')
+  })
+})
 
 describe('cli worktree recovery', () => {
   let tempDir: string
