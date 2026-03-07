@@ -10,7 +10,7 @@
     "dist/"
   ],
   "scripts": {
-    "build": "npx esbuild src/cli.ts --outfile dist/cli.js --platform=node --bundle",
+    "build": "npx esbuild src/cli.ts --bundle --platform=node --format=esm --outfile=dist/cli.js",
     "prepublishOnly": "npm run build",
     "test": "bun test",
     "test:watch": "vitest",
