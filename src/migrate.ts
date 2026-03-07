@@ -112,7 +112,7 @@ export async function repairHub(dest: string, log: (msg: string) => void = conso
  * .git files point to stale paths (e.g. after a parent-dir rename).
  * Returns the hub path.
  */
-export async function resumeMigrate(dest: string, log: (msg: string) => void = console.log): Promise<string> {
+export async function resumeMigrate(dest: string, log: (msg: string) => void = console.log, warn?: (msg: string) => void): Promise<string> {
   const destBare = join(dest, '.bare')
   const hubWorktrees = await listWorktrees(dest)
 
@@ -146,7 +146,7 @@ export async function resumeMigrate(dest: string, log: (msg: string) => void = c
       }
 
       log(`Moving [${branch}] → ${expectedPath}`)
-      await processLinkedWorktree({ ...wt, path: wtPath }, dest, destBare)
+      await processLinkedWorktree({ ...wt, path: wtPath }, dest, destBare, log, warn)
     }
   }
 
@@ -162,7 +162,7 @@ export async function resumeMigrate(dest: string, log: (msg: string) => void = c
  * Orchestrate the full migration of a git repo into the bare-hub layout.
  * Returns the path to the created hub directory.
  */
-export async function migrate(config: RepoConfig, options: MigrateOptions): Promise<string> {
+export async function migrate(config: RepoConfig, options: MigrateOptions, log?: (msg: string) => void, warn?: (msg: string) => void): Promise<string> {
   const source = resolve(options.source)
   const dest = options.dest
     ? resolve(options.dest)
@@ -250,12 +250,12 @@ export async function migrate(config: RepoConfig, options: MigrateOptions): Prom
 
     // Process linked worktrees starting at index 1
     for (let i = 1; i < worktreesResolved.length; i++) {
-      await processLinkedWorktree(worktreesResolved[i], dest, destBare)
+      await processLinkedWorktree(worktreesResolved[i], dest, destBare, log, warn)
     }
   } else {
     // Step 9: Not standard — process all linked worktrees starting at index 0
     for (const wt of worktreesResolved) {
-      await processLinkedWorktree(wt, dest, destBare)
+      await processLinkedWorktree(wt, dest, destBare, log, warn)
     }
   }
 
@@ -266,6 +266,8 @@ async function processLinkedWorktree(
   wt: { path: string; head: string; branch: string | null; isBare: boolean },
   dest: string,
   destBare: string,
+  log?: (msg: string) => void,
+  warn?: (msg: string) => void,
 ): Promise<void> {
   const wtSrc = wt.path
   const wtBranch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
@@ -279,7 +281,7 @@ async function processLinkedWorktree(
   const gitFileContent = readFileSync(join(wtDest, '.git'), 'utf8')
   const match = gitFileContent.match(/^gitdir:\s*(.+)/m)
   if (!match) {
-    console.warn(`Could not parse .git file in ${wtDest}`)
+    warn?.(`Could not parse .git file in ${wtDest}`)
     return
   }
   const oldPath = match[1].trim()
@@ -293,6 +295,6 @@ async function processLinkedWorktree(
   if (existsSync(newAdmin)) {
     writeFileSync(join(newAdmin, 'gitdir'), wtDest + '/.git\n')
   } else {
-    console.warn(`Admin dir ${newAdmin} does not exist for worktree ${wtDest}`)
+    warn?.(`Admin dir ${newAdmin} does not exist for worktree ${wtDest}`)
   }
 }

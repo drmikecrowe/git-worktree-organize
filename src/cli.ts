@@ -128,7 +128,11 @@ async function main(): Promise<void> {
     }
 
     console.log()
-    const hubPath = await resumeMigrate(dest, msg => console.log(`${green('==>')} ${msg}`))
+    const hubPath = await resumeMigrate(
+      dest,
+      msg => console.log(`${green('==>')} ${msg}`),
+      msg => console.log(`${yellow('warn:')} ${msg}`),
+    )
     console.log()
     console.log(`${green('==>')} Verifying with git worktree list...`)
     console.log(run('git', ['-C', hubPath, 'worktree', 'list']).stdout)
@@ -225,7 +229,12 @@ async function main(): Promise<void> {
   console.log()
 
   // Run migration
-  const hubPath = await migrate(config, { source: sourcePath, dest: destArg ?? '' })
+  const hubPath = await migrate(
+    config,
+    { source: sourcePath, dest: destArg ?? '' },
+    msg => console.log(`${green('==>')} ${msg}`),
+    msg => console.log(`${yellow('warn:')} ${msg}`),
+  )
 
   // Verify
   console.log(`${green('==>')} Verifying with git worktree list...`)
