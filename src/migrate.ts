@@ -1,24 +1,10 @@
-import { mkdirSync, writeFileSync, readFileSync, existsSync, renameSync, statSync, readdirSync } from 'node:fs'
+import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync, readdirSync, renameSync } from 'node:fs'
 import { join, dirname, basename, resolve } from 'node:path'
 import { run } from './run.ts'
 import type { RepoConfig } from './detect.ts'
 import { listWorktrees } from './worktrees.ts'
 import { setGitConfig } from './git.ts'
-
-/**
- * Move src to dest. Uses rename if on same filesystem, cp+rm otherwise.
- * Unlike fs.ts move(), this handles the case where dest does not yet exist
- * by statting the parent of dest for the filesystem check.
- */
-async function moveDir(src: string, dest: string): Promise<void> {
-  const destForStat = existsSync(dest) ? dest : dirname(dest)
-  if (statSync(src).dev === statSync(destForStat).dev) {
-    renameSync(src, dest)
-  } else {
-    run('cp', ['-a', src, dest])
-    run('rm', ['-rf', src])
-  }
-}
+import { move } from './fs.ts'
 
 export interface MigrateOptions {
   source: string
@@ -241,7 +227,7 @@ export async function migrate(config: RepoConfig, options: MigrateOptions): Prom
     run('rm', ['-rf', join(source, '.git')])
 
     // Move source dir → mainDest
-    await moveDir(source, mainDest)
+    await move(source, mainDest)
 
     // Create dest/.bare/worktrees/mainSafe/ dir
     const mainAdminDir = join(destBare, 'worktrees', mainSafe)
@@ -287,7 +273,7 @@ async function processLinkedWorktree(
   const wtDest = join(dest, wtSafe)
 
   // Move wtSrc → wtDest
-  await moveDir(wtSrc, wtDest)
+  await move(wtSrc, wtDest)
 
   // Read wtDest/.git file, parse gitdir: <oldPath>
   const gitFileContent = readFileSync(join(wtDest, '.git'), 'utf8')
