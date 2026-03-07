@@ -12,8 +12,9 @@
   "scripts": {
     "build": "npx esbuild src/cli.ts --bundle --platform=node --format=esm --outfile=dist/cli.js",
     "prepublishOnly": "npm run build",
-    "test": "bun test",
+    "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "release": "op run -- npm publish"
   },
   "devDependencies": {
