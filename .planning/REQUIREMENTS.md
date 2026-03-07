@@ -16,7 +16,7 @@ Requirements for Production Ready milestone. Each maps to roadmap phases.
 ### Testing
 
 - [ ] **TEST-01**: User can run all tests with `npm test` using Vitest only
-- [ ] **TEST-02**: Tests use Node.js-compatible shell execution (no Bun `$` API)
+- [x] **TEST-02**: Tests use Node.js-compatible shell execution (no Bun `$` API)
 - [ ] **TEST-03**: Test helper functions work without Bun runtime
 
 ### Worktree Recovery
@@ -78,7 +78,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RUNTIME-02 | Phase 1 | Done |
 | RUNTIME-03 | Phase 1 | Done |
 | TEST-01 | Phase 2 | Pending |
-| TEST-02 | Phase 2 | Pending |
+| TEST-02 | Phase 2 | Done |
 | TEST-03 | Phase 2 | Pending |
 | QUALITY-01 | Phase 3 | Pending |
 | QUALITY-02 | Phase 3 | Pending |

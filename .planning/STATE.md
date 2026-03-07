@@ -17,10 +17,10 @@
 
 ## Current Position
 
-**Phase:** 01-runtime-migration (completed)
-**Plan:** 01/01 complete
-**Status:** Phase 1 complete - ready for Phase 2
-**Progress:** `[====                ]` 20%
+**Phase:** 02-test-migration (in progress)
+**Plan:** 01/04 complete
+**Status:** Shell helper created, ready to migrate test helpers
+**Progress:** `[=====               ]` 25%
 
 ---
 
@@ -29,8 +29,8 @@
 | Metric | Value |
 |--------|-------|
 | Phases Completed | 1/5 |
-| Requirements Delivered | 3/20 |
-| Tests Passing | 34/34 (baseline) |
+| Requirements Delivered | 4/20 |
+| Tests Passing | 37/37 (baseline + shell helper) |
 | Days in Milestone | 0 |
 
 ---
@@ -47,6 +47,7 @@
 | `src/worktrees.ts` | Worktree parsing |
 | `src/run.ts` | Process execution wrapper |
 | `test/helpers/repo.ts` | Factory functions for test repos |
+| `test/helpers/shell.ts` | Node.js spawn-based shell helper |
 
 ### Decisions
 
@@ -57,6 +58,8 @@
 | Worktree recovery before in-place | In-place migration needs robust worktree handling | 2026-03-07 |
 | npx esbuild over bun build | Removes Bun as build dependency, accessible to Node.js developers | 2026-03-07 |
 | esbuild --format=esm | Required for ESM compatibility with package.json "type": "module" | 2026-03-07 |
+| Keep bun alias until migration complete | Existing tests use bun shim which has vitest compatibility issues | 2026-03-07 |
+| Function-based shell API | Replaces tagged-template `$` API for better Node.js compatibility | 2026-03-07 |
 
 ### Active Concerns
 
@@ -74,13 +77,14 @@ None.
 ### Last Session
 
 **Date:** 2026-03-07
-**Activity:** Completed Phase 1 runtime migration plan
-**Outcome:** Build toolchain migrated from Bun to Node.js esbuild
+**Activity:** Completed Phase 2 Plan 1 - Shell helper creation
+**Outcome:** Function-based shell helper ready for test migration
 
 ### Next Steps
 
-1. Run `/gsd:plan-phase 2` to plan test migration
-2. Replace Bun `$` API with Node.js spawn in test helpers
+1. Run `/gsd:execute-phase` to continue Phase 2 (migrate test/helpers/repo.ts)
+2. Migrate remaining tests to use new shell helper
+3. Remove bun alias from vitest.config.ts after all tests migrated
 
 ---
 

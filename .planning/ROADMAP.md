@@ -119,7 +119,7 @@ Transform git-worktree-organize into a production-grade CLI tool with simplified
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Runtime Migration | 1/1 | Done | 2026-03-07 |
-| 2. Test Migration | 0/3 | Planned | - |
+| 2. Test Migration | 1/3 | In Progress | - |
 | 3. Code Quality | 0/0 | Not started | - |
 | 4. Worktree Recovery | 0/0 | Not started | - |
 | 5. CLI In-Place | 0/0 | Not started | - |
@@ -134,7 +134,7 @@ Transform git-worktree-organize into a production-grade CLI tool with simplified
 | RUNTIME-02 | Phase 1 | Done |
 | RUNTIME-03 | Phase 1 | Done |
 | TEST-01 | Phase 2 | Pending |
-| TEST-02 | Phase 2 | Pending |
+| TEST-02 | Phase 2 | Done |
 | TEST-03 | Phase 2 | Pending |
 | QUALITY-01 | Phase 3 | Pending |
 | QUALITY-02 | Phase 3 | Pending |
