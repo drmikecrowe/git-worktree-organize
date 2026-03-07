@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join, dirname, basename } from 'node:path'
-import { $ } from 'bun'
+import { run } from './helpers/shell.ts'
 import { describe, it, expect } from 'vitest'
 import { migrate, resumeMigrate, repairHub, findHub, isPartialMigration } from '../src/migrate.ts'
 import { detect } from '../src/detect.ts'
@@ -83,16 +83,16 @@ describe('migrate', () => {
     // Create a standard repo with two branches that sanitize to the same name:
     // 'a/b' → 'a-b' and 'a-b' → 'a-b'
     // We use different worktree directory names to avoid the filesystem conflict.
-    await $`git init ${src}`.quiet()
-    await $`git -C ${src} config user.email "test@test.com"`.quiet()
-    await $`git -C ${src} config user.name "Test"`.quiet()
-    await $`git -C ${src} commit --allow-empty -m "init"`.quiet()
+    await run('git', ['init', src], { quiet: true })
+    await run('git', ['-C', src, 'config', 'user.email', 'test@test.com'], { quiet: true })
+    await run('git', ['-C', src, 'config', 'user.name', 'Test'], { quiet: true })
+    await run('git', ['-C', src, 'commit', '--allow-empty', '-m', 'init'], { quiet: true })
     // Create first worktree with branch 'a/b' in dir 'wt1'
     const wt1 = join(src + '-wt1')
-    await $`git -C ${src} worktree add -b ${'a/b'} ${wt1}`.quiet()
+    await run('git', ['-C', src, 'worktree', 'add', '-b', 'a/b', wt1], { quiet: true })
     // Create second worktree with branch 'a-b' in dir 'wt2'
     const wt2 = join(src + '-wt2')
-    await $`git -C ${src} worktree add -b ${'a-b'} ${wt2}`.quiet()
+    await run('git', ['-C', src, 'worktree', 'add', '-b', 'a-b', wt2], { quiet: true })
 
     const config = await detect(src)
     const dest = src + '-hub'
@@ -132,12 +132,12 @@ describe('migrate', () => {
     const hotfixDest  = join(dest, 'hotfix')
     const featureOrig = dest + '-feature-orig'
     const hotfixOrig  = dest + '-hotfix-orig'
-    await $`mv -f ${featureDest} ${featureOrig}`.quiet()
-    await $`mv -f ${hotfixDest}  ${hotfixOrig}`.quiet()
+    await run('mv', ['-f', featureDest, featureOrig], { quiet: true })
+    await run('mv', ['-f', hotfixDest, hotfixOrig], { quiet: true })
     // Update the hub's worktree admin to point back to original paths so git
     // worktree list shows them as outside dest/.
-    await $`git -C ${dest} worktree repair ${featureOrig}`.quiet()
-    await $`git -C ${dest} worktree repair ${hotfixOrig}`.quiet()
+    await run('git', ['-C', dest, 'worktree', 'repair', featureOrig], { quiet: true })
+    await run('git', ['-C', dest, 'worktree', 'repair', hotfixOrig], { quiet: true })
 
     // Now simulate the user re-running on dest (which is the partial hub)
     expect(isPartialMigration(dest)).toBe(true)
@@ -174,7 +174,7 @@ describe('migrate', () => {
 
     // Now rename base/ → base.old/ (simulating user renaming the parent dir)
     const baseOld = join(tmp, 'project.old')
-    await $`mv -f ${base} ${baseOld}`.quiet()
+    await run('mv', ['-f', base, baseOld], { quiet: true })
 
     const dest = join(baseOld, 'main-bare')
     // resumeMigrate should detect the worktrees are already at dest/feature
@@ -203,9 +203,9 @@ describe('migrate', () => {
     mkdirSync(subDir, { recursive: true })
     const featureCorrect = join(dest, 'feature')
     const featureWrong   = join(subDir, 'feature')
-    await $`mv -f ${featureCorrect} ${featureWrong}`.quiet()
+    await run('mv', ['-f', featureCorrect, featureWrong], { quiet: true })
     // Update git's record so it knows about the new (wrong) location
-    await $`git -C ${dest} worktree repair ${featureWrong}`.quiet()
+    await run('git', ['-C', dest, 'worktree', 'repair', featureWrong], { quiet: true })
 
     // resumeMigrate should detect feature is at dest/sub/feature (!= dest/feature)
     // and move it to dest/feature, fixing .git files
@@ -231,19 +231,19 @@ describe('migrate', () => {
     const base = join(tmp, 'expense')
     const sourceOrig = join(base, 'main')
     mkdirSync(sourceOrig, { recursive: true })
-    await $`git init ${sourceOrig}`.quiet()
-    await $`git -C ${sourceOrig} config user.email "test@test.com"`.quiet()
-    await $`git -C ${sourceOrig} config user.name "Test"`.quiet()
-    await $`git -C ${sourceOrig} commit --allow-empty -m "init"`.quiet()
+    await run('git', ['init', sourceOrig], { quiet: true })
+    await run('git', ['-C', sourceOrig, 'config', 'user.email', 'test@test.com'], { quiet: true })
+    await run('git', ['-C', sourceOrig, 'config', 'user.name', 'Test'], { quiet: true })
+    await run('git', ['-C', sourceOrig, 'commit', '--allow-empty', '-m', 'init'], { quiet: true })
 
     // Add worktree inside base/ (sibling of 'main')
     const wtDir = join(base, 'main-worktrees', 'feature')
     mkdirSync(dirname(wtDir), { recursive: true })
-    await $`git -C ${sourceOrig} worktree add -b feature ${wtDir}`.quiet()
+    await run('git', ['-C', sourceOrig, 'worktree', 'add', '-b', 'feature', wtDir], { quiet: true })
 
     // Rename base/ → base.old/ (parent dir renamed, git paths now stale)
     const baseOld = join(tmp, 'expense.old')
-    await $`mv -f ${base} ${baseOld}`.quiet()
+    await run('mv', ['-f', base, baseOld], { quiet: true })
 
     const source = join(baseOld, 'main')
     const dest = base  // same path as the original base (= 'expense')
