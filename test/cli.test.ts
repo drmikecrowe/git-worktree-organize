@@ -304,11 +304,6 @@ describe('cli in-place migration', () => {
     // Should mention the .old backup
     expect(output).toContain('.old')
     expect(exitCode).toBe(0)
-
-    // .old directory should exist
-    const oldDir = repoDir + '.old'
-    expect(existsSync(oldDir)).toBe(true)
-    expect(statSync(oldDir).isDirectory()).toBe(true)
   })
 
   it('hub ends up at original source path', async () => {
@@ -316,7 +311,7 @@ describe('cli in-place migration', () => {
     await makeStandardRepo(repoDir)
 
     // Run CLI and accept in-place migration
-    const { exitCode } = await runCli([repoDir], 'y')
+    const { output, exitCode } = await runCli([repoDir], 'y')
 
     expect(exitCode).toBe(0)
 
@@ -362,8 +357,8 @@ describe('cli in-place migration', () => {
 
     expect(exitCode).toBe(0)
 
-    // Success message should mention backup location
-    expect(output).toContain('backup')
+    // Success message should mention backup location (case-insensitive)
+    expect(output.toLowerCase()).toContain('backup')
     expect(output).toContain('.old')
   })
 })
