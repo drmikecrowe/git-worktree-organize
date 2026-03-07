@@ -70,7 +70,7 @@ Transform git-worktree-organize into a production-grade CLI tool with simplified
 3. All existing tests continue to pass after refactoring
 4. Code review confirms no behavioral changes to migration logic
 
-**Plans:** TBD
+**Plans:** 01 (2 tasks)
 
 ---
 
@@ -120,7 +120,7 @@ Transform git-worktree-organize into a production-grade CLI tool with simplified
 |-------|----------------|--------|-----------|
 | 1. Runtime Migration | 1/1 | Done | 2026-03-07 |
 | 2. Test Migration | 2/3 | In Progress | - |
-| 3. Code Quality | 0/0 | Not started | - |
+| 3. Code Quality | 0/1 | Planned | - |
 | 4. Worktree Recovery | 0/0 | Not started | - |
 | 5. CLI In-Place | 0/0 | Not started | - |
 
@@ -156,4 +156,4 @@ Transform git-worktree-organize into a production-grade CLI tool with simplified
 ---
 
 *Roadmap created: 2026-03-07*
-*Last updated: 2026-03-07 (Phase 2 planned)*
+*Last updated: 2026-03-07 (Phase 3 planned)*
