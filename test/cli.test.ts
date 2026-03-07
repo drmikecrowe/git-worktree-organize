@@ -268,3 +268,102 @@ describe('cli worktree recovery', () => {
     })
   })
 })
+
+describe('cli in-place migration', () => {
+  let tempDir: string
+
+  beforeEach(() => {
+    tempDir = makeTempDir()
+  })
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  it('prompts for in-place when standard repo + no dest', async () => {
+    // Create a standard repo without destination arg
+    const repoDir = join(tempDir, 'myproject')
+    await makeStandardRepo(repoDir)
+
+    // Run CLI with just source (no destination)
+    const { output, exitCode } = await runCli([repoDir], 'n')
+
+    // Should prompt for in-place migration
+    expect(output).toContain('in-place')
+    expect(output).toContain('Aborted')
+    expect(exitCode).toBe(0)
+  })
+
+  it('renames source to .old before creating hub', async () => {
+    const repoDir = join(tempDir, 'myproject')
+    await makeStandardRepo(repoDir)
+
+    // Run CLI and accept in-place migration
+    const { output, exitCode } = await runCli([repoDir], 'y')
+
+    // Should mention the .old backup
+    expect(output).toContain('.old')
+    expect(exitCode).toBe(0)
+
+    // .old directory should exist
+    const oldDir = repoDir + '.old'
+    expect(existsSync(oldDir)).toBe(true)
+    expect(statSync(oldDir).isDirectory()).toBe(true)
+  })
+
+  it('hub ends up at original source path', async () => {
+    const repoDir = join(tempDir, 'myproject')
+    await makeStandardRepo(repoDir)
+
+    // Run CLI and accept in-place migration
+    const { exitCode } = await runCli([repoDir], 'y')
+
+    expect(exitCode).toBe(0)
+
+    // Hub should be at the original source path
+    await assertHubStructure(repoDir)
+  })
+
+  it('aborts if .old already exists', async () => {
+    const repoDir = join(tempDir, 'myproject')
+    await makeStandardRepo(repoDir)
+
+    // Create .old directory to block migration
+    const oldDir = repoDir + '.old'
+    mkdirSync(oldDir, { recursive: true })
+
+    // Run CLI and accept in-place migration
+    const { output, exitCode } = await runCli([repoDir], 'y')
+
+    // Should abort with error about .old existing
+    expect(output).toContain('.old')
+    expect(output).toContain('already exists')
+    expect(exitCode).toBe(1)
+  })
+
+  it('shows confirmation before rename', async () => {
+    const repoDir = join(tempDir, 'myproject')
+    await makeStandardRepo(repoDir)
+
+    // Run CLI - decline in-place to see the prompt
+    const { output } = await runCli([repoDir], 'n')
+
+    // Should show what will happen
+    expect(output).toContain('rename')
+    expect(output).toContain('hub')
+  })
+
+  it('mentions .old backup on success', async () => {
+    const repoDir = join(tempDir, 'myproject')
+    await makeStandardRepo(repoDir)
+
+    // Run CLI and accept in-place migration
+    const { output, exitCode } = await runCli([repoDir], 'y')
+
+    expect(exitCode).toBe(0)
+
+    // Success message should mention backup location
+    expect(output).toContain('backup')
+    expect(output).toContain('.old')
+  })
+})
