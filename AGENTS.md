@@ -36,7 +36,7 @@ This is **git-worktree-organize**, a CLI tool that reorganizes git repositories 
 cat .planning/codebase/TESTING.md
 
 # 2. Run existing tests to ensure baseline is green
-bun test
+npm test
 
 # 3. Create the test file if new module, or add to existing
 ```
@@ -75,9 +75,9 @@ describe('moduleName', () => {
 ### Test Commands
 
 ```bash
-bun test              # Run all tests
-bun test --watch      # Watch mode
-npm run test:watch    # Vitest watch mode
+npm test              # Run all tests (vitest run)
+npm run test:watch    # Watch mode
+npm run test:coverage # Run with coverage
 ```
 
 ### Test Helpers
@@ -88,6 +88,9 @@ Use factories from `test/helpers/repo.ts`:
 - `makeBareHubRepo(dir)` - Create hub-layout repo
 - `assertHubStructure(dir)` - Verify hub layout is valid
 - `assertWorktreeWorks(dir, branch)` - Verify worktree is functional
+
+Shell commands use `test/helpers/shell.ts`:
+- `run(cmd, args, options)` - Execute shell commands with Node.js spawn
 
 ---
 
@@ -148,7 +151,7 @@ bd create "Found edge case" \
 3. **Write failing test FIRST** (for features/bugs)
 4. **Implement minimum code to pass**
 5. **Refactor if needed**
-6. **Run tests**: `bun test`
+6. **Run tests**: `npm test`
 7. **Close issue**: `bd close <id> --reason "Done"`
 
 ---
@@ -201,7 +204,7 @@ HOMEBREW_NO_AUTO_UPDATE=1 brew install X
 
 ```bash
 # 1. Run tests
-bun test
+npm test
 
 # 2. Commit changes
 git add -A && git commit -m "..."
@@ -217,7 +220,7 @@ git status  # MUST show "up to date with origin"
 
 ### Before Ending Session
 
-- [ ] All tests passing (`bun test`)
+- [ ] All tests passing (`npm test`)
 - [ ] Changes committed
 - [ ] Pushed to remote
 - [ ] Issues closed or updated
@@ -259,19 +262,19 @@ From `.planning/codebase/CONVENTIONS.md`:
 
 ```bash
 # Tests
-bun test                      # Run all tests
-bun test test/migrate.test.ts # Run specific file
+npm test                            # Run all tests
+npm test test/migrate.test.ts       # Run specific file
 
 # Issues
-bd ready                      # Find available work
-bd create "Title" -t feature -p 1  # New issue
-bd update bd-42 --claim       # Claim work
-bd close bd-42                # Complete
+bd ready                            # Find available work
+bd create "Title" -t feature -p 1   # New issue
+bd update bd-42 --claim             # Claim work
+bd close bd-42                      # Complete
 
 # Codebase context
 cat .planning/codebase/ARCHITECTURE.md  # System design
 cat .planning/codebase/CONCERNS.md      # Known issues
 
 # Session end
-bun test && git add -A && git commit -m "..." && git push
+npm test && git add -A && git commit -m "..." && git push
 ```
