@@ -1,5 +1,14 @@
 # Milestones
 
+## v1.1 Production Ready (Shipped: 2026-03-08)
+
+**Phases completed:** 5 phases, 9 plans, 0 tasks
+
+**Key accomplishments:**
+- (none recorded)
+
+---
+
 ## v1.0 — Initial Release ✓
 
 **Shipped:** 2026-03-07 (as v1.0.13)
