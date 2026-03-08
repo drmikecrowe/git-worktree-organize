@@ -42,30 +42,54 @@ git-worktree-organize <source> [destination]
 | Argument      | Description                                                      |
 |---------------|------------------------------------------------------------------|
 | `source`      | Path to the existing git repository to migrate                   |
-| `destination` | Target hub directory (default: `<parent>/<repo-name>-bare`)      |
+| `destination` | Target hub directory (omit for in-place migration prompt)        |
+
+**Without a destination**, the tool prompts for in-place migration:
+- Renames `<source>` to `<source>.old`
+- Creates the hub at the original `<source>` path
+
+**With a destination**, the tool migrates to the specified path.
 
 The tool shows a preview of what will be created and asks for confirmation before making any changes.
 
-## Example
+## Examples
 
-Given a repo at `/projects/myrepo` with branches `main`, `feature-x`, and `hotfix`:
+### In-place migration (recommended)
 
 ```sh
-git-worktree-organize /projects/myrepo /projects/myrepo-bare
+git-worktree-organize /projects/myrepo
+```
+
+Prompts to reorganize in place, resulting in:
+
+```
+/projects/myrepo/          ← hub (was renamed from myrepo.old)
+├── .bare/
+├── .git
+├── main/
+└── feature-x/
+
+/projects/myrepo.old/      ← backup of original
+```
+
+### Migrate to new location
+
+```sh
+git-worktree-organize /projects/myrepo /projects/myrepo-organized
 ```
 
 Result:
 
 ```
-/projects/myrepo-bare/
+/projects/myrepo-organized/
 ├── .bare/
 ├── .git
-├── main/
+├── main/          ← original /projects/myrepo moved here
 ├── feature-x/
 └── hotfix/
 ```
 
-The original `/projects/myrepo` is moved to `/projects/myrepo-bare/main/`. No data is lost.
+The original `/projects/myrepo` becomes the `main/` worktree. No data is lost.
 
 ## Features
 
