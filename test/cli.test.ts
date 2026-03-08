@@ -9,6 +9,8 @@
  * the CLI triggers the right behaviors.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { join, dirname, basename } from 'node:path'
 import { mkdirSync, rmSync, writeFileSync, existsSync, statSync, readdirSync } from 'node:fs'
 import { spawn } from 'node:child_process'
@@ -95,6 +97,33 @@ async function runCli(
     })
   })
 }
+
+describe('cli --version', () => {
+  it('shows version with --version flag', async () => {
+    const { output, exitCode } = await runCli(['--version'])
+
+    expect(exitCode).toBe(0)
+    // Should show version in format "git-worktree-organize v1.2.3"
+    expect(output).toMatch(/git-worktree-organize v\d+\.\d+\.\d+/)
+  })
+
+  it('shows version with -v flag', async () => {
+    const { output, exitCode } = await runCli(['-v'])
+
+    expect(exitCode).toBe(0)
+    expect(output).toMatch(/git-worktree-organize v\d+\.\d+\.\d+/)
+  })
+
+  it('version matches package.json version', async () => {
+    const { output } = await runCli(['--version'])
+
+    // Read version from package.json
+    const pkgPath = join(process.cwd(), 'package.json')
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+
+    expect(output).toContain(pkg.version)
+  })
+})
 
 describe('cli validation mode', () => {
   let tempDir: string

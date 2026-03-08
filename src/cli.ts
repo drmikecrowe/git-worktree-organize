@@ -12,6 +12,7 @@ import { detect } from './detect.ts'
 import { listWorktrees, type Worktree } from './worktrees.ts'
 import { migrate, resumeMigrate, repairHub, isPartialMigration, sanitizeBranch, resolveWorktreePath, findHub, migrateInPlace } from './migrate.ts'
 import { findMissingWorktrees, repairWorktree, type SearchResult } from './recover.ts'
+import { getVersion } from './version.ts'
 
 // ANSI color helpers
 const GREEN  = '\x1b[32m'
@@ -230,16 +231,26 @@ Arguments:
   destination  Target hub directory (default: <parent>/<name>-bare)
 
 Options:
-  -h, --help   Show help`)
+  -h, --help      Show help
+  -v, --version   Show version`)
 }
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2)
 
+  // Handle --version flag
+  if (args[0] === '-v' || args[0] === '--version') {
+    console.log(`git-worktree-organize ${getVersion(true)}`)
+    process.exit(0)
+  }
+
   if (args.length === 0 || args[0] === '-h' || args[0] === '--help') {
     usage()
     process.exit(0)
   }
+
+  // Show banner with version on startup
+  console.log(`${bold('git-worktree-organize')} ${getVersion(true)}\n`)
 
   const sourcePath = args[0]
   const destArg    = args[1]
