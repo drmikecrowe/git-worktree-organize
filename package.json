@@ -1,6 +1,6 @@
 {
   "name": "git-worktree-organize",
-  "version": "1.0.13",
+  "version": "1.1.0",
   "description": "Convert any git repo into the canonical bare-hub worktree layout",
   "type": "module",
   "bin": {
