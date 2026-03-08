@@ -456,6 +456,34 @@ async function main(): Promise<void> {
   // This renames the source to .old and creates the hub at the original path.
   if (config.type === 'standard' && !destArg) {
     const repoName = basename(source)
+
+    // Show worktrees that will be migrated
+    let mainBranch = 'main'
+    if (allWorktrees.length > 0) {
+      mainBranch = allWorktrees[0].branch ?? 'main'
+    }
+
+    console.log('Worktrees to migrate:')
+    const maxNameLen = allWorktrees.reduce((m, wt) => {
+      const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
+      return Math.max(m, branch.length)
+    }, 0)
+
+    for (const wt of allWorktrees) {
+      const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
+      const safe = sanitizeBranch(branch)
+      const isMain = branch === mainBranch
+      const destDir = join(source, safe)
+      const nameCol = bold(`[${branch}]`).padEnd(maxNameLen + 2 + BOLD.length + RESET.length)
+      const annotation = isMain
+        ? `  (labeled ${yellow('[main]')})`.padEnd(18 + YELLOW.length + RESET.length)
+        : ''.padEnd(18)
+      console.log(`  ${nameCol}${annotation}  →  ${destDir}`)
+    }
+    console.log()
+    console.log(`Hub destination: ${bold(source)}  (bare repo at ${source}/.bare)`)
+    console.log()
+
     console.log(`No destination specified. Migrate in-place?`)
     console.log(`This will rename '${bold(repoName)}' to '${bold(repoName + '.old')}' and create the hub here.`)
     console.log()
