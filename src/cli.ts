@@ -6,7 +6,7 @@
  */
 
 import { resolve, join, dirname, basename } from 'node:path'
-import { existsSync, statSync, readFileSync } from 'node:fs'
+import { existsSync, statSync, readFileSync, readdirSync } from 'node:fs'
 import { run } from './run.ts'
 import { detect } from './detect.ts'
 import { listWorktrees, type Worktree } from './worktrees.ts'
@@ -56,11 +56,93 @@ function isGitPointerValid(worktreePath: string, hubPath: string): boolean {
     return false
   }
 
-  const gitdir = match[1].trim()
+  const adminDir = match[1].trim()
   const bareDir = join(hubPath, '.bare')
 
-  // Check if gitdir points inside the hub's .bare/worktrees directory
-  return gitdir.includes(bareDir) && gitdir.includes('/worktrees/')
+  // Must point inside this hub's .bare/worktrees/
+  if (!adminDir.includes(bareDir) || !adminDir.includes('/worktrees/')) {
+    return false
+  }
+
+  // Admin dir must actually exist
+  if (!existsSync(adminDir)) {
+    return false
+  }
+
+  // Admin dir's gitdir must point back to this worktree's .git file
+  const adminGitdirFile = join(adminDir, 'gitdir')
+  if (!existsSync(adminGitdirFile)) {
+    return false
+  }
+  const adminGitdir = readFileSync(adminGitdirFile, 'utf8').trim()
+  if (adminGitdir !== gitFile) {
+    return false
+  }
+
+  // commondir must be '../../' (relative to .bare/worktrees/<name>/)
+  const commondirFile = join(adminDir, 'commondir')
+  if (!existsSync(commondirFile) || readFileSync(commondirFile, 'utf8').trim() !== '../..') {
+    return false
+  }
+
+  // If extensions.worktreeConfig = true, config.worktree must exist with core.bare = false
+  const sharedConfig = join(hubPath, '.bare', 'config')
+  if (existsSync(sharedConfig)) {
+    const cfg = readFileSync(sharedConfig, 'utf8')
+    const extMatch = cfg.match(/\[extensions\]([\s\S]*?)(?=\[|$)/i)
+    if (extMatch && /worktreeconfig\s*=\s*true/i.test(extMatch[1])) {
+      const configWt = join(adminDir, 'config.worktree')
+      if (!existsSync(configWt) || !readFileSync(configWt, 'utf8').includes('bare = false')) {
+        return false
+      }
+    }
+  }
+
+  // Functional check: verify git actually works in this worktree by
+  // reading the HEAD commit (requires a working commondir to resolve refs)
+  try {
+    run('git', ['-C', worktreePath, 'rev-parse', 'HEAD'])
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Enumerate worktrees by scanning .bare/worktrees/ admin dirs directly.
+ * Used as a fallback when `git worktree list` fails due to corruption.
+ */
+function listWorktreesFromAdminDirs(hubPath: string): Worktree[] {
+  const adminBase = join(hubPath, '.bare', 'worktrees')
+  if (!existsSync(adminBase)) return []
+
+  const worktrees: Worktree[] = []
+  for (const adminName of readdirSync(adminBase)) {
+    const adminDir = join(adminBase, adminName)
+    if (!statSync(adminDir).isDirectory()) continue
+
+    const gitdirFile = join(adminDir, 'gitdir')
+    if (!existsSync(gitdirFile)) continue
+
+    const wtGitFile = readFileSync(gitdirFile, 'utf8').trim()
+    const wtPath = dirname(wtGitFile)
+
+    // Read branch from HEAD file in admin dir
+    const headFile = join(adminDir, 'HEAD')
+    let branch: string | null = null
+    let head = ''
+    if (existsSync(headFile)) {
+      const headContent = readFileSync(headFile, 'utf8').trim()
+      if (headContent.startsWith('ref: refs/heads/')) {
+        branch = headContent.slice('ref: refs/heads/'.length)
+      } else {
+        head = headContent
+      }
+    }
+
+    worktrees.push({ path: wtPath, head, branch, isBare: false })
+  }
+  return worktrees
 }
 
 /**
@@ -69,7 +151,15 @@ function isGitPointerValid(worktreePath: string, hubPath: string): boolean {
  * If any missing or stale worktrees exist, offers to search and repair them.
  */
 async function runValidationMode(hubPath: string): Promise<void> {
-  const worktrees = await listWorktrees(hubPath)
+  let worktrees: Worktree[]
+  try {
+    worktrees = await listWorktrees(hubPath)
+  } catch {
+    // git worktree list failed — likely due to broken commondir or other corruption.
+    // Fall back to scanning admin dirs to enumerate worktrees.
+    console.log(`${yellow('warn:')} git worktree list failed; scanning admin dirs to enumerate worktrees`)
+    worktrees = listWorktreesFromAdminDirs(hubPath)
+  }
   const validated: ValidatedWorktree[] = []
 
   for (const wt of worktrees) {
@@ -139,14 +229,22 @@ async function runValidationMode(hubPath: string): Promise<void> {
   if (counts.stale > 0) summaryParts.push(`${counts.stale} stale`)
   console.log(`Summary: ${summaryParts.join(', ')}`)
 
-  // Offer repair for missing/stale worktrees
-  const needsRepair = validated.filter(v => v.status === 'missing' || v.status === 'stale')
+  // Auto-repair stale worktrees (their path exists, only the .git pointer is wrong)
+  const staleWorktrees = validated.filter(v => v.status === 'stale')
+  if (staleWorktrees.length > 0) {
+    console.log()
+    console.log(`${green('==>')} Auto-repairing ${staleWorktrees.length} stale worktree(s)...`)
+    await repairHub(hubPath, msg => console.log(`  ${msg}`))
+  }
+
+  // Offer interactive repair for missing worktrees (require user to locate them)
+  const needsRepair = validated.filter(v => v.status === 'missing')
   if (needsRepair.length === 0) {
     return
   }
 
   console.log()
-  console.log(`${yellow('warn:')} ${needsRepair.length} worktree(s) need repair.`)
+  console.log(`${yellow('warn:')} ${needsRepair.length} missing worktree(s) need repair.`)
 
   // Search for missing worktrees
   const searchDirs = [dirname(hubPath)]

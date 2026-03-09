@@ -6,6 +6,127 @@ import { listWorktrees } from './worktrees.ts'
 import { setGitConfig } from './git.ts'
 import { move } from './fs.ts'
 
+/**
+ * Template content for AGENTS.md, documenting the hub-and-worktree layout
+ * for AI coding agents working in the repository.
+ */
+const AGENTS_MD_TEMPLATE = `# Git Worktree Layout
+
+This repository uses **git worktrees** with a bare repository pattern for parallel development across multiple branches.
+
+## Directory Structure
+
+\`\`\`
+<project>/                        # Root project directory
+├── .bare/                        # Bare git repository (shared git data)
+│   ├── worktrees/               # Worktree metadata
+│   │   ├── main/                # Main branch metadata
+│   │   └── <branch-name>/       # Per-branch worktree metadata
+│   ├── objects/                 # Git objects (shared)
+│   ├── refs/                    # Git refs (shared)
+│   └── config                   # Repository config
+├── .git                         # Points to .bare (gitdir: ./.bare)
+├── main/                        # Main branch worktree (primary)
+├── <branch-name>/               # Feature/fix branch worktrees
+└── *.code-workspace             # VS Code multi-root workspace
+\`\`\`
+
+## How It Works
+
+- **Bare Repository**: \`.bare/\` contains all git data (objects, refs, config)
+- **Worktrees**: Each branch checkout is a separate directory at the root level
+- **Shared History**: All worktrees share the same git history from \`.bare/\`
+
+## Working with Worktrees
+
+### Create a new worktree
+
+\`\`\`bash
+# From any worktree or the root
+git worktree add <branch-name>
+
+# Create new branch and worktree
+git worktree add -b <new-branch> <directory-name>
+\`\`\`
+
+### List worktrees
+
+\`\`\`bash
+git worktree list
+\`\`\`
+
+### Remove a worktree
+
+\`\`\`bash
+# After merging/deleting the branch
+git worktree remove <branch-name>
+
+# Force removal (if untracked files exist)
+git worktree remove --force <branch-name>
+\`\`\`
+
+### Prune stale worktree references
+
+\`\`\`bash
+git worktree prune
+\`\`\`
+
+## Conventions
+
+1. **Naming**: Worktree directories match the branch name (e.g., \`feature-auth\`, \`fix-login-bug\`)
+2. **Main worktree**: \`main/\` is the primary worktree for the main branch
+3. **Workspace file**: Open \`*.code-workspace\` in VS Code to work with multiple worktrees
+
+## Tips
+
+- Each worktree has its own \`.git\` file pointing back to \`.bare/\`
+- You can run different branches simultaneously without stashing
+- IDEs can open multiple worktrees as separate folders in one workspace
+- Run \`git worktree prune\` periodically to clean up deleted worktree references
+`
+
+/**
+ * Write AGENTS.md to the hub root if it doesn't already exist.
+ * Skips creation if any worktree already contains an AGENTS.md
+ * (to avoid overwriting user-maintained docs).
+ */
+export function writeAgentsMd(dest: string): void {
+  const agentsPath = join(dest, 'AGENTS.md')
+  if (!existsSync(agentsPath)) {
+    writeFileSync(agentsPath, AGENTS_MD_TEMPLATE)
+  }
+}
+
+/**
+ * Returns true if .bare/config has [extensions] worktreeConfig = true.
+ * When enabled, each worktree admin dir needs a config.worktree file with
+ * core.bare = false to override the shared core.bare = true setting.
+ */
+function worktreeConfigEnabled(bareDir: string): boolean {
+  const configFile = join(bareDir, 'config')
+  if (!existsSync(configFile)) return false
+  const content = readFileSync(configFile, 'utf8')
+  const extensionsMatch = content.match(/\[extensions\]([\s\S]*?)(?=\[|$)/i)
+  if (!extensionsMatch) return false
+  return /worktreeconfig\s*=\s*true/i.test(extensionsMatch[1])
+}
+
+const WORKTREE_CONFIG_CONTENT = '[core]\n\tbare = false\n'
+
+/**
+ * If extensions.worktreeConfig is enabled, write config.worktree to adminDir
+ * with core.bare = false so git operations work inside the worktree.
+ * Safe to call unconditionally — skips if worktreeConfig is not enabled.
+ */
+export function ensureWorktreeConfig(adminDir: string, bareDir: string, log?: (msg: string) => void): void {
+  if (!worktreeConfigEnabled(bareDir)) return
+  const configWtFile = join(adminDir, 'config.worktree')
+  if (!existsSync(configWtFile) || readFileSync(configWtFile, 'utf8') !== WORKTREE_CONFIG_CONTENT) {
+    log?.(`Writing config.worktree for [${basename(adminDir)}]`)
+    writeFileSync(configWtFile, WORKTREE_CONFIG_CONTENT)
+  }
+}
+
 export interface MigrateOptions {
   source: string
   dest: string
@@ -94,6 +215,17 @@ export async function repairHub(dest: string, log: (msg: string) => void = conso
     // Only repair worktrees that are (or should be) inside dest/
     if (!worktreePath.startsWith(dest + '/')) continue
     if (!existsSync(registeredGitFile) || !statSync(registeredGitFile).isFile()) continue
+
+    // Fix commondir if it's wrong — must always be '../../' (relative to .bare/worktrees/<name>/)
+    const commondirFile = join(adminDir, 'commondir')
+    const expectedCommondir = '../../\n'
+    if (!existsSync(commondirFile) || readFileSync(commondirFile, 'utf8') !== expectedCommondir) {
+      log(`Repairing commondir for [${basename(worktreePath)}]`)
+      writeFileSync(commondirFile, expectedCommondir)
+    }
+
+    // If worktreeConfig is enabled, ensure config.worktree has core.bare = false
+    ensureWorktreeConfig(adminDir, join(dest, '.bare'), log)
 
     const content = readFileSync(registeredGitFile, 'utf8')
     const match = content.match(/^gitdir:\s*(.+)/m)
@@ -246,9 +378,10 @@ export async function migrateInPlace(
   const mainAdminDir = join(destBare, 'worktrees', mainSafe)
   mkdirSync(mainAdminDir, { recursive: true })
 
-  // Step 9: Write gitdir, commondir, HEAD
+  // Step 9: Write gitdir, commondir, HEAD, and config.worktree if needed
   writeFileSync(join(mainAdminDir, 'gitdir'), mainDest + '/.git\n')
   writeFileSync(join(mainAdminDir, 'commondir'), '../../\n')
+  ensureWorktreeConfig(mainAdminDir, destBare)
   const headToWrite = mainHeadContent.endsWith('\n') ? mainHeadContent : mainHeadContent + '\n'
   writeFileSync(join(mainAdminDir, 'HEAD'), headToWrite)
 
@@ -270,6 +403,8 @@ export async function migrateInPlace(
   }
 
   log(`Original repo backed up at: ${oldPath}`)
+
+  writeAgentsMd(resolvedSource)
 
   return resolvedSource
 }
@@ -354,9 +489,10 @@ export async function migrate(config: RepoConfig, options: MigrateOptions, log?:
     const mainAdminDir = join(destBare, 'worktrees', mainSafe)
     mkdirSync(mainAdminDir, { recursive: true })
 
-    // Write gitdir, commondir, HEAD
+    // Write gitdir, commondir, HEAD, and config.worktree if needed
     writeFileSync(join(mainAdminDir, 'gitdir'), mainDest + '/.git\n')
     writeFileSync(join(mainAdminDir, 'commondir'), '../../\n')
+    ensureWorktreeConfig(mainAdminDir, destBare)
     const headToWrite = mainHeadContent.endsWith('\n') ? mainHeadContent : mainHeadContent + '\n'
     writeFileSync(join(mainAdminDir, 'HEAD'), headToWrite)
 
@@ -379,6 +515,8 @@ export async function migrate(config: RepoConfig, options: MigrateOptions, log?:
       await processLinkedWorktree(wt, dest, destBare, log, warn)
     }
   }
+
+  writeAgentsMd(dest)
 
   return dest
 }
@@ -412,9 +550,11 @@ async function processLinkedWorktree(
   // Write wtDest/.git pointing to new admin dir
   writeFileSync(join(wtDest, '.git'), `gitdir: ${newAdmin}\n`)
 
-  // Update admin dir's gitdir if it exists
+  // Update admin dir's gitdir, commondir, and config.worktree
   if (existsSync(newAdmin)) {
     writeFileSync(join(newAdmin, 'gitdir'), wtDest + '/.git\n')
+    writeFileSync(join(newAdmin, 'commondir'), '../../\n')
+    ensureWorktreeConfig(newAdmin, destBare)
   } else {
     warn?.(`Admin dir ${newAdmin} does not exist for worktree ${wtDest}`)
   }

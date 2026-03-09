@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { join, dirname, basename } from 'node:path'
 import { run } from './helpers/shell.ts'
 import { describe, it, expect } from 'vitest'
-import { migrate, resumeMigrate, repairHub, findHub, isPartialMigration } from '../src/migrate.ts'
+import { migrate, migrateInPlace, resumeMigrate, repairHub, findHub, isPartialMigration } from '../src/migrate.ts'
 import { detect } from '../src/detect.ts'
 import {
   makeStandardRepo,
@@ -348,5 +348,68 @@ describe('migrate', () => {
     await makeBareHubRepo(dest)  // creates dest/.bare already
 
     await expect(migrate(config, { source: src, dest })).rejects.toThrow('already exists')
+  })
+
+  describe('AGENTS.md', () => {
+    it('migrate creates AGENTS.md in destination when not present', async () => {
+      const src = makeTempDir()
+      await makeStandardRepo(src)
+      const config = await detect(src)
+      const dest = src + '-hub'
+
+      await migrate(config, { source: src, dest })
+
+      const agentsPath = join(dest, 'AGENTS.md')
+      expect(existsSync(agentsPath)).toBe(true)
+      const content = readFileSync(agentsPath, 'utf8')
+      expect(content).toContain('Git Worktree Layout')
+      expect(content).toContain('.bare/')
+    })
+
+    it('migrate does not overwrite existing AGENTS.md at hub root', async () => {
+      const src = makeTempDir()
+      await makeStandardRepo(src)
+      const config = await detect(src)
+      const dest = src + '-hub'
+
+      await migrate(config, { source: src, dest })
+
+      // Now overwrite the AGENTS.md with custom content
+      writeFileSync(join(dest, 'AGENTS.md'), 'custom content\n')
+
+      // Migrate another repo to the same dest won't work (dest/.bare exists),
+      // so test writeAgentsMd directly
+      const { writeAgentsMd } = await import('../src/migrate.ts')
+      writeAgentsMd(dest)
+
+      expect(readFileSync(join(dest, 'AGENTS.md'), 'utf8')).toBe('custom content\n')
+    })
+
+    it('migrateInPlace creates AGENTS.md in hub when not present', async () => {
+      const src = makeTempDir()
+      await makeStandardRepo(src)
+
+      const hubPath = await migrateInPlace(src)
+
+      const agentsPath = join(hubPath, 'AGENTS.md')
+      expect(existsSync(agentsPath)).toBe(true)
+      const content = readFileSync(agentsPath, 'utf8')
+      expect(content).toContain('Git Worktree Layout')
+    })
+
+    it('migrateInPlace does not overwrite existing AGENTS.md at hub root', async () => {
+      const src = makeTempDir()
+      await makeStandardRepo(src)
+
+      const hubPath = await migrateInPlace(src)
+
+      // Overwrite with custom content, then call writeAgentsMd again
+      writeFileSync(join(hubPath, 'AGENTS.md'), 'my custom agents doc\n')
+
+      const { writeAgentsMd } = await import('../src/migrate.ts')
+      writeAgentsMd(hubPath)
+
+      expect(readFileSync(join(hubPath, 'AGENTS.md'), 'utf8')).toBe('my custom agents doc\n')
+    })
   })
 })

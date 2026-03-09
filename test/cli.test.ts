@@ -187,6 +187,137 @@ describe('cli validation mode', () => {
     expect(output).toContain('feature-y')
   })
 
+  it('reports stale when .git points to non-existent admin dir inside .bare/worktrees/', async () => {
+    const hubDir = join(tempDir, 'project-bare')
+    await makeHubWithCommit(hubDir)
+
+    // Create a worktree, then corrupt its .git to point to a plausible
+    // but non-existent admin dir inside .bare/worktrees/
+    const featureWt = join(hubDir, 'feature-z')
+    await run('git', ['-C', hubDir, 'worktree', 'add', '-b', 'feature-z', featureWt], { quiet: true, env: isolatedEnv })
+
+    // This path looks valid (has .bare and /worktrees/) but the admin dir doesn't exist
+    const fakeAdmin = join(hubDir, '.bare', 'worktrees', 'nonexistent-branch')
+    writeFileSync(join(featureWt, '.git'), `gitdir: ${fakeAdmin}\n`)
+
+    const { output } = await runCli([hubDir])
+
+    expect(output).toContain('stale')
+    expect(output).toContain('feature-z')
+  })
+
+  it('reports stale when worktree .git points to wrong existing admin dir (cross-pointer mismatch)', async () => {
+    const hubDir = join(tempDir, 'project-bare')
+    await makeHubWithCommit(hubDir)
+
+    // Create two worktrees
+    const wtA = join(hubDir, 'branch-a')
+    const wtB = join(hubDir, 'branch-b')
+    await run('git', ['-C', hubDir, 'worktree', 'add', '-b', 'branch-a', wtA], { quiet: true, env: isolatedEnv })
+    await run('git', ['-C', hubDir, 'worktree', 'add', '-b', 'branch-b', wtB], { quiet: true, env: isolatedEnv })
+
+    // Corrupt branch-a/.git to point to branch-b's admin dir (which exists)
+    // Both paths are within .bare/worktrees/, but the admin dir points back to branch-b, not branch-a
+    const adminB = join(hubDir, '.bare', 'worktrees', 'branch-b')
+    writeFileSync(join(wtA, '.git'), `gitdir: ${adminB}\n`)
+
+    const { output } = await runCli([hubDir])
+
+    expect(output).toContain('stale')
+    expect(output).toContain('branch-a')
+  })
+
+  it('reports stale when git operations fail despite correct pointer structure', async () => {
+    const hubDir = join(tempDir, 'project-bare')
+    await makeHubWithCommit(hubDir)
+
+    const featureWt = join(hubDir, 'feature-broken')
+    await run('git', ['-C', hubDir, 'worktree', 'add', '-b', 'feature-broken', featureWt], { quiet: true, env: isolatedEnv })
+
+    // Pointers are correct but break git by corrupting commondir in the admin dir
+    const adminDir = join(hubDir, '.bare', 'worktrees', 'feature-broken')
+    writeFileSync(join(adminDir, 'commondir'), '/nonexistent/path\n')
+
+    const { output } = await runCli([hubDir])
+
+    expect(output).toContain('stale')
+    expect(output).toContain('feature-broken')
+  })
+
+  it('auto-repairs broken commondir without prompting', async () => {
+    const hubDir = join(tempDir, 'project-bare')
+    await makeHubWithCommit(hubDir)
+
+    const featureWt = join(hubDir, 'feature-fixme')
+    await run('git', ['-C', hubDir, 'worktree', 'add', '-b', 'feature-fixme', featureWt], { quiet: true, env: isolatedEnv })
+
+    // Corrupt commondir — pointers look correct but git fails
+    const adminDir = join(hubDir, '.bare', 'worktrees', 'feature-fixme')
+    writeFileSync(join(adminDir, 'commondir'), '/nonexistent/path\n')
+
+    // No stdin — auto-repair must not prompt
+    const { output, exitCode } = await runCli([hubDir])
+
+    expect(output).toContain('stale')
+    expect(output).toMatch(/[Rr]epair/i)
+    expect(exitCode).toBe(0)
+
+    // commondir must be corrected
+    const commondir = readFileSync(join(adminDir, 'commondir'), 'utf8')
+    expect(commondir.trim()).toBe('../../')
+  })
+
+  it('auto-repairs stale worktrees without prompting', async () => {
+    const hubDir = join(tempDir, 'project-bare')
+    await makeHubWithCommit(hubDir)
+
+    const featureWt = join(hubDir, 'feature-auto')
+    await run('git', ['-C', hubDir, 'worktree', 'add', '-b', 'feature-auto', featureWt], { quiet: true, env: isolatedEnv })
+    writeFileSync(join(featureWt, '.git'), 'gitdir: /wrong/path\n')
+
+    // No stdin input — auto-repair must not prompt
+    const { output, exitCode } = await runCli([hubDir])
+
+    expect(output).toContain('stale')
+    expect(output).toContain('feature-auto')
+    expect(output).toMatch(/[Rr]epair/i)
+    expect(exitCode).toBe(0)
+
+    // Verify the .git file was actually corrected
+    const gitContent = readFileSync(join(featureWt, '.git'), 'utf8')
+    expect(gitContent).toContain('.bare/worktrees')
+  })
+
+  it('reports stale and auto-repairs when worktreeConfig = true but config.worktree is missing', async () => {
+    const hubDir = join(tempDir, 'project-bare')
+    await makeHubWithCommit(hubDir)
+
+    const featureWt = join(hubDir, 'feature-wtcfg')
+    await run('git', ['-C', hubDir, 'worktree', 'add', '-b', 'feature-wtcfg', featureWt], { quiet: true, env: isolatedEnv })
+
+    // Enable worktreeConfig extension in .bare/config
+    const bareConfig = join(hubDir, '.bare', 'config')
+    const cfgContent = readFileSync(bareConfig, 'utf8')
+    writeFileSync(bareConfig, cfgContent + '\n[extensions]\n\tworktreeConfig = true\n')
+
+    // Remove config.worktree from the admin dir to simulate the stale condition
+    const adminDir = join(hubDir, '.bare', 'worktrees', 'feature-wtcfg')
+    const configWt = join(adminDir, 'config.worktree')
+    if (existsSync(configWt)) rmSync(configWt)
+
+    // No stdin — auto-repair must not prompt
+    const { output, exitCode } = await runCli([hubDir])
+
+    expect(output).toContain('stale')
+    expect(output).toContain('feature-wtcfg')
+    expect(output).toMatch(/[Rr]epair/i)
+    expect(exitCode).toBe(0)
+
+    // config.worktree must be written with core.bare = false
+    expect(existsSync(configWt)).toBe(true)
+    expect(readFileSync(configWt, 'utf8')).toContain('bare = false')
+  })
+
   it('shows summary counts', async () => {
     const hubDir = join(tempDir, 'project-bare')
     await makeHubWithCommit(hubDir)
