@@ -10,7 +10,7 @@ import { existsSync, statSync, readFileSync, readdirSync } from 'node:fs'
 import { run } from './run.ts'
 import { detect } from './detect.ts'
 import { listWorktrees, type Worktree } from './worktrees.ts'
-import { migrate, resumeMigrate, repairHub, isPartialMigration, sanitizeBranch, resolveWorktreePath, findHub, migrateInPlace } from './migrate.ts'
+import { migrate, resumeMigrate, repairHub, isPartialMigration, sanitizeBranch, resolveWorktreePath, findHub, migrateInPlace, isAgentWorktree } from './migrate.ts'
 import { findMissingWorktrees, repairWorktree, type SearchResult } from './recover.ts'
 import { getVersion } from './version.ts'
 
@@ -405,6 +405,7 @@ async function main(): Promise<void> {
     const hubWorktrees = await listWorktrees(dest)
     const pending = hubWorktrees.filter(wt => {
       if (wt.isBare) return false
+      if (isAgentWorktree(wt.path)) return false
       const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
       return wt.path !== join(dest, sanitizeBranch(branch))
     })
@@ -503,6 +504,7 @@ async function main(): Promise<void> {
       pending.length = 0
       pending.push(...hubWorktrees.filter(wt => {
         if (wt.isBare) return false
+        if (isAgentWorktree(wt.path)) return false
         const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
         return wt.path !== join(dest, sanitizeBranch(branch))
       }))
@@ -562,12 +564,13 @@ async function main(): Promise<void> {
     }
 
     console.log('Worktrees to migrate:')
-    const maxNameLen = allWorktrees.reduce((m, wt) => {
+    const displayWorktrees = allWorktrees.filter(wt => !wt.isBare && !isAgentWorktree(wt.path))
+    const maxNameLen = displayWorktrees.reduce((m, wt) => {
       const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
       return Math.max(m, branch.length)
     }, 0)
 
-    for (const wt of allWorktrees) {
+    for (const wt of displayWorktrees) {
       const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
       const safe = sanitizeBranch(branch)
       const isMain = branch === mainBranch
@@ -716,7 +719,7 @@ async function main(): Promise<void> {
   }
   // ─────────────────────────────────────────────────────────────────────────
 
-  const worktrees = allWorktrees.filter(wt => !wt.isBare)
+  const worktrees = allWorktrees.filter(wt => !wt.isBare && !isAgentWorktree(wt.path))
 
   // Determine which branch is "main" (first worktree for standard repos)
   let mainBranch: string | null = null
