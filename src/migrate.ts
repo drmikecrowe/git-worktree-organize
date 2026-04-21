@@ -133,6 +133,75 @@ export interface MigrateOptions {
 }
 
 /**
+ * Check if a worktree path is a Claude agent worktree (.claude/worktrees/agent-*).
+ */
+export function isAgentWorktree(wtPath: string): boolean {
+  const normalized = wtPath.replace(/\\/g, '/')
+  return /\/\.claude\/worktrees\/agent-[^/]+\/?$/.test(normalized)
+}
+
+/**
+ * Fix git references for an agent worktree that stayed inside the main worktree.
+ * Unlike processLinkedWorktree, this does NOT move the worktree — it only updates
+ * .git file and admin dir to point to the new bare repo.
+ */
+export function fixupAgentWorktree(
+  wt: { path: string; head: string; branch: string | null; isBare: boolean },
+  source: string,
+  mainDest: string,
+  destBare: string,
+  warn?: (msg: string) => void,
+): void {
+  // Compute new path: agent worktree moved with main worktree
+  const normalized = wt.path.replace(/\\/g, '/')
+  const sourceNorm = source.replace(/\\/g, '/')
+  let relativePath: string
+  if (normalized.startsWith(sourceNorm + '/')) {
+    relativePath = normalized.slice(sourceNorm.length + 1)
+  } else {
+    // Stale path (e.g. migrateInPlace renamed source) — extract .claude/... suffix
+    const idx = normalized.indexOf('/.claude/worktrees/')
+    if (idx === -1) {
+      warn?.(`Cannot determine new path for agent worktree ${wt.path}`)
+      return
+    }
+    relativePath = normalized.slice(idx + 1)
+  }
+
+  const newPath = join(mainDest, relativePath)
+  if (!existsSync(newPath)) {
+    warn?.(`Agent worktree not found at ${newPath}, skipping`)
+    return
+  }
+
+  const gitFile = join(newPath, '.git')
+  if (!existsSync(gitFile)) {
+    warn?.(`No .git file in agent worktree ${newPath}`)
+    return
+  }
+
+  const gitFileContent = readFileSync(gitFile, 'utf8')
+  const match = gitFileContent.match(/^gitdir:\s*(.+)/m)
+  if (!match) {
+    warn?.(`Could not parse .git file in ${newPath}`)
+    return
+  }
+
+  const adminName = basename(match[1].trim())
+  const newAdmin = join(destBare, 'worktrees', adminName)
+
+  writeFileSync(gitFile, `gitdir: ${newAdmin}\n`)
+
+  if (existsSync(newAdmin)) {
+    writeFileSync(join(newAdmin, 'gitdir'), newPath + '/.git\n')
+    writeFileSync(join(newAdmin, 'commondir'), '../../\n')
+    ensureWorktreeConfig(newAdmin, destBare)
+  } else {
+    warn?.(`Admin dir ${newAdmin} does not exist for agent worktree ${newPath}`)
+  }
+}
+
+/**
  * Sanitize a branch name for use as a directory name (replace / with -).
  */
 export function sanitizeBranch(branch: string): string {
@@ -253,6 +322,7 @@ export async function resumeMigrate(dest: string, log: (msg: string) => void = c
   // at the wrong sub-path (e.g. dest/main-bare/feature instead of dest/feature).
   const pending = hubWorktrees.filter(wt => {
     if (wt.isBare) return false
+    if (isAgentWorktree(wt.path)) return false
     const branch = wt.branch ?? `detached-${wt.head.slice(0, 8)}`
     return wt.path !== join(dest, sanitizeBranch(branch))
   })
@@ -399,7 +469,12 @@ export async function migrateInPlace(
 
   // Step 13: Process linked worktrees starting at index 1
   for (let i = 1; i < worktrees.length; i++) {
-    await processLinkedWorktree(worktrees[i], resolvedSource, destBare, log, warn)
+    const wt = worktrees[i]
+    if (isAgentWorktree(wt.path)) {
+      fixupAgentWorktree(wt, resolvedSource, mainDest, destBare, warn)
+    } else {
+      await processLinkedWorktree(wt, resolvedSource, destBare, log, warn)
+    }
   }
 
   log(`Original repo backed up at: ${oldPath}`)
@@ -507,12 +582,21 @@ export async function migrate(config: RepoConfig, options: MigrateOptions, log?:
 
     // Process linked worktrees starting at index 1
     for (let i = 1; i < worktreesResolved.length; i++) {
-      await processLinkedWorktree(worktreesResolved[i], dest, destBare, log, warn)
+      const wt = worktreesResolved[i]
+      if (isAgentWorktree(wt.path)) {
+        fixupAgentWorktree(wt, source, mainDest, destBare, warn)
+      } else {
+        await processLinkedWorktree(wt, dest, destBare, log, warn)
+      }
     }
   } else {
     // Step 9: Not standard — process all linked worktrees starting at index 0
     for (const wt of worktreesResolved) {
-      await processLinkedWorktree(wt, dest, destBare, log, warn)
+      if (isAgentWorktree(wt.path)) {
+        fixupAgentWorktree(wt, source, join(dest, sanitizeBranch(wt.branch ?? `detached-${wt.head.slice(0, 8)}`)), destBare, warn)
+      } else {
+        await processLinkedWorktree(wt, dest, destBare, log, warn)
+      }
     }
   }
 

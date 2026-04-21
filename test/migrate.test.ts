@@ -350,6 +350,88 @@ describe('migrate', () => {
     await expect(migrate(config, { source: src, dest })).rejects.toThrow('already exists')
   })
 
+  describe('agent worktrees', () => {
+    it('migrate: agent worktrees stay in main folder', async () => {
+      const src = makeTempDir()
+      await makeStandardRepo(src, ['feature'])
+
+      // Add agent worktree inside .claude/worktrees/
+      const agentDir = join(src, '.claude', 'worktrees', 'agent-fix-bug')
+      mkdirSync(dirname(agentDir), { recursive: true })
+      await run('git', ['-C', src, 'worktree', 'add', '-b', 'agent-fix-bug', agentDir], { quiet: true, env: isolatedEnv })
+
+      const config = await detect(src)
+      const dest = src + '-hub'
+
+      await migrate(config, { source: src, dest })
+
+      await assertHubStructure(dest)
+      await assertWorktreeWorks(dest, 'main')
+      await assertWorktreeWorks(dest, 'feature')
+
+      // Agent worktree should be inside main folder's .claude/worktrees/
+      const mainDir = join(dest, 'main')
+      const agentPath = join(mainDir, '.claude', 'worktrees', 'agent-fix-bug')
+      expect(existsSync(agentPath)).toBe(true)
+      await run('git', ['-C', agentPath, 'status'], { quiet: true })
+
+      // Agent worktree should NOT be at top level of hub
+      expect(existsSync(join(dest, 'agent-fix-bug'))).toBe(false)
+    })
+
+    it('migrateInPlace: agent worktrees stay in main folder', async () => {
+      const src = makeTempDir()
+      await makeStandardRepo(src, ['feature'])
+
+      // Add agent worktree
+      const agentDir = join(src, '.claude', 'worktrees', 'agent-task-1')
+      mkdirSync(dirname(agentDir), { recursive: true })
+      await run('git', ['-C', src, 'worktree', 'add', '-b', 'agent-task-1', agentDir], { quiet: true, env: isolatedEnv })
+
+      await migrateInPlace(src)
+
+      await assertHubStructure(src)
+      await assertWorktreeWorks(src, 'main')
+      await assertWorktreeWorks(src, 'feature')
+
+      // Agent worktree should be inside main folder
+      const mainDir = join(src, 'main')
+      const agentPath = join(mainDir, '.claude', 'worktrees', 'agent-task-1')
+      expect(existsSync(agentPath)).toBe(true)
+      await run('git', ['-C', agentPath, 'status'], { quiet: true })
+
+      // Agent worktree should NOT be at top level
+      expect(existsSync(join(src, 'agent-task-1'))).toBe(false)
+    })
+
+    it('resumeMigrate: agent worktrees not moved to hub top level', async () => {
+      const src = makeTempDir()
+      await makeStandardRepo(src, ['feature'])
+
+      // Add agent worktree
+      const agentDir = join(src, '.claude', 'worktrees', 'agent-review')
+      mkdirSync(dirname(agentDir), { recursive: true })
+      await run('git', ['-C', src, 'worktree', 'add', '-b', 'agent-review', agentDir], { quiet: true, env: isolatedEnv })
+
+      const config = await detect(src)
+      const dest = src + '-hub'
+      await migrate(config, { source: src, dest })
+
+      // Resume should not try to move the agent worktree
+      const logs: string[] = []
+      await resumeMigrate(dest, msg => logs.push(msg))
+
+      // Agent worktree should still be inside main folder
+      const mainDir = join(dest, 'main')
+      const agentPath = join(mainDir, '.claude', 'worktrees', 'agent-review')
+      expect(existsSync(agentPath)).toBe(true)
+      await run('git', ['-C', agentPath, 'status'], { quiet: true })
+
+      // Not at top level
+      expect(existsSync(join(dest, 'agent-review'))).toBe(false)
+    })
+  })
+
   describe('AGENTS.md', () => {
     it('migrate creates AGENTS.md in destination when not present', async () => {
       const src = makeTempDir()
